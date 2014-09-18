@@ -212,6 +212,7 @@ Bigram {
 		var times = List.new;
 		var orderedTimes = List.new;
 		var orderedDegrees = List.new;
+		var orderedIndex;
 
 		// order notes by timestamp
 		notes.do { |note|
@@ -232,12 +233,32 @@ Bigram {
 		};
 
 		// add an extra value in order to perform the following substraction
-		orderedTimes = orderedTimes.add(orderedTimes.last+1); // TODO: with that we got a dur of 1 in last note; it should be adjusted p.e. to the bigram total duration
+		orderedTimes = orderedTimes.add(orderedTimes.last+1);
+		// TODO: with that we got a dur of 1 in last note;
+		//       it should be adjusted p.e. to the bigram total duration
 
+
+		orderedIndex = 0;
 		(orderedTimes.size-1).do { |i|
-			durations.add(orderedTimes[i+1]-orderedTimes[i])
-		};
 
+			var delta = orderedTimes[i+1]-orderedTimes[i];
+
+
+			if (delta > 0) {
+				// sequential notes
+
+				durations.add(delta);
+				orderedIndex = orderedIndex + 1;
+			} {
+				// simultaneous notes:
+				// put all orderedDegrees notes inside an array
+				// and don't add the 0 to the duration array
+
+				var simultaneousNote = orderedDegrees.at(orderedIndex+1);
+				orderedDegrees.removeAt(orderedIndex+1);
+					orderedDegrees.put(orderedIndex,[orderedDegrees.at(orderedIndex),simultaneousNote].flat);
+			}
+		};
 
 		^[orderedDegrees.asArray,durations.asArray]
 	}
