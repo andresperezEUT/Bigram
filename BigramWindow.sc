@@ -1,43 +1,56 @@
-// TODO: default subdivision menu to default subdivision (4)
-// TODO: circle size independent from time subdivision
+// TODO: zoom
+// TODO: use scrollView??
+// TODO: shift key for holding selected notes in edit mode
 
 BigramWindow : QWindow {
 
 	var <bigramView;
-	var <vSlider, <hSlider, <zSlider;
 	var insertButton, editButton;
 	var buttonList;
 	var beatSubdivisionMenu;
 
 	var <elementSize = 30;
-	var <bigramSpace = 50; //vertical
+	var <bigramSpace = 30; //vertical
 	var <bigramSubdivisionSpace; //= bigramSpace / 6;  //(2 bigramSpace in a octave)
+	// margins of editView
 	var <upperSpace = 50;
+	var <lowerSpace = 50;
 	var <leftSpace = 50;
+	var <rightSpace = 50;
+
 	var <beatLineSpace = 40; //horizontal (time subdivision)
 	var <beatSubdivision = 4;
 
-	var <numOctaves = 5;
+	var <numBeats;
+	var <numOctaves = 8;
 
 	var lastMouseDownPosition;
 	var selectionRectangle;
 	var noteSelectedInLastDown;
 
+	var <circleRadius = 5;
+
 	var <mode;
 
 
 	// internal representation
-	// var <notes; //list
+
 
 	var <bigram;
 
-	*new { arg name = "Bigram Editor", bounds, resizable = true, border = true, server, scroll = false;
-		^super.new(name, bounds, resizable, border, server, scroll).init
+	// edit view limits
+	var <maxRightPosition, <maxDownPosition;
+
+
+	*new { |numBeats|
+		^super.new("Bigram Editor",scroll:true).init(numBeats)
 	}
 
-	init {
+	init { |myNumBeats|
 		var width = this.bounds.width;
 		var height = this.bounds.height;
+
+		numBeats = myNumBeats ? 16;
 
 		bigramSubdivisionSpace = bigramSpace / 6;  //(2 bigramSpace in a octave)
 
@@ -45,11 +58,6 @@ BigramWindow : QWindow {
 
 		bigram = Bigram.new;
 
-		// instanciate sliders
-
-		vSlider = Slider(this,Rect(width-elementSize,0,elementSize,height-elementSize));
-		hSlider = Slider(this,Rect(0,height-elementSize,width-elementSize,elementSize));
-		zSlider = Slider2D(this,Rect(width-elementSize,height-elementSize,elementSize,elementSize));
 
 		// instanciate buttons
 
@@ -71,21 +79,27 @@ BigramWindow : QWindow {
 
 		beatSubdivisionMenu = PopUpMenu(this,Rect(2*elementSize,0,2*elementSize,elementSize));
 		beatSubdivisionMenu.items = ["1","2","3","4","5","6","7","8"];
+		beatSubdivisionMenu.value = beatSubdivision - 1; //starts in 0
 		beatSubdivisionMenu.action = { |menu|
 			beatSubdivision = menu.items[menu.value].asInt;
 			this.refresh;
 		};
 
+		// bigram view limits
+		maxRightPosition = leftSpace + (numBeats * beatLineSpace);
+		maxDownPosition = upperSpace + ((2*numOctaves) * bigramSpace);
 
 		// instanciate view
-		bigramView = UserView(this,Rect(0,elementSize,width-elementSize,height-(2*elementSize))).background_(Color.white);
+		bigramView = UserView(this,Rect(0, elementSize, maxRightPosition + rightSpace, maxDownPosition + lowerSpace)).background_(Color.white);
 
 		bigramView.drawFunc = {
 			this.drawBigram;
-			this.drawLines;
 			this.drawCircles;
 			this.drawSelectionRectangle;
 		};
+
+
+
 
 		// define actions
 
@@ -95,13 +109,6 @@ BigramWindow : QWindow {
 
 		bigramView.keyDownAction = this.keyDownAction;
 
-
-
-		// resize
-		this.view.onResize_({
-			this.resize;
-			// this.refresh; --> automatic
-		})
 	}
 
 	setBeatSubdivision { |newBeatSubdivision|
@@ -114,6 +121,13 @@ BigramWindow : QWindow {
 		var width = this.bounds.width;
 		var height = this.bounds.height;
 
+		var numBeatSubdivisionsToDraw, beatSubdivisionLineSpace;
+
+		/////////// HORIZONTAL LINES ////////////
+		//
+		// bigram lines
+		//
+
 		Pen.strokeColor = Color.black;
 		(2*numOctaves + 1).do{ |i| // two octaves
 			if (i.even) {
@@ -121,61 +135,56 @@ BigramWindow : QWindow {
 			} {
 				Pen.width = 0.75;
 			};
-			Pen.line(0@(i*bigramSpace+upperSpace),width@(i*bigramSpace+upperSpace));
+			Pen.line(leftSpace@(i*bigramSpace+upperSpace),maxRightPosition@(i*bigramSpace+upperSpace));
 			Pen.stroke;
 		};
 
+		//
 		// bigram subdivisions
+		//
+
 		Pen.strokeColor = Color.red;
 		Pen.width = 0.2;
 		(12 * numOctaves).do {|i| //12 subdivisions per octave
-			Pen.line(0@(i*bigramSubdivisionSpace+upperSpace),width@(i*bigramSubdivisionSpace+upperSpace))
+			Pen.line(leftSpace@(i*bigramSubdivisionSpace+upperSpace),maxRightPosition@(i*bigramSubdivisionSpace+upperSpace))
 		};
 		Pen.stroke;
-	}
+
+		//
+		//
+		//
+		/////////// VERTICAL LINES ////////////
+		//
+		// beat lines
+		//
 
 
-	drawLines {
-		var width = this.bounds.width;
-		var height = this.bounds.height;
-
-		var numBeatsToDraw;
-		var numBeatSubdivisionsToDraw, beatSubdivisionLineSpace;
-
-
-		//draw bars;         TODO: make it custom for each beat/bar
-		numBeatsToDraw = (width / beatLineSpace).floor;
 		Pen.strokeColor = Color.black;
 		Pen.width = 0.4;
-		numBeatsToDraw.do{ |i|
-			Pen.line((i*beatLineSpace+leftSpace)@0,(i*beatLineSpace+leftSpace)@(height-elementSize));
+		numBeats.do{ |i|
+			Pen.line((i*beatLineSpace+leftSpace)@upperSpace,(i*beatLineSpace+leftSpace)@maxDownPosition);
 		};
 		Pen.stroke;
 
-		//draw bar subdivisions
+		//
+		// beat subdivision lines
+		//
+
 		Pen.width = 0.2;
-		numBeatSubdivisionsToDraw = numBeatsToDraw * beatSubdivision;
+		numBeatSubdivisionsToDraw = numBeats * beatSubdivision;
 		beatSubdivisionLineSpace = beatLineSpace / beatSubdivision;
+
 		numBeatSubdivisionsToDraw.do{ |i|
-			Pen.line((i*beatSubdivisionLineSpace+leftSpace)@0,(i*beatSubdivisionLineSpace+leftSpace)@(height-elementSize));
+			Pen.line((i*beatSubdivisionLineSpace+leftSpace)@upperSpace,(i*beatSubdivisionLineSpace+leftSpace)@maxDownPosition);
 		};
 		Pen.stroke;
+
+		//
+		//
+		//
+		///////////
 	}
 
-
-
-	resize {
-		var width = this.bounds.width;
-		var height = this.bounds.height;
-
-		// sliders
-		vSlider.moveTo(width-elementSize,0).resizeTo(elementSize,height-elementSize);
-		hSlider.moveTo(0,height-elementSize).resizeTo(width-elementSize,elementSize);
-		zSlider.moveTo(width-elementSize,height-elementSize).resizeTo(elementSize,elementSize);
-
-		// view
-		bigramView.resizeTo(width-elementSize,height-(elementSize*2))
-	}
 
 	mouseDownAction {^{ |view, x, y, modifiers, buttonNumber, clickCount|
 		var xPos, yPos;
@@ -185,7 +194,7 @@ BigramWindow : QWindow {
 		// [xPos,yPos] are the bigram coordinates, in the form (absolutePos,totalPitch)
 		#xPos,yPos = this.getBigramCoordinate(x,y);
 
-/*		"mousePosition: ".post;
+		/*		"mousePosition: ".post;
 		[x,y].postln;
 		"bigramPosition: ".post;
 		[xPos,yPos].postln;*/
@@ -199,7 +208,7 @@ BigramWindow : QWindow {
 			var pitchClass, height;
 			var beat, relativePos;
 
-			//calculate vertiscal position
+			//calculate vertical position
 			pitchClass = yPos % 12;
 			height = (yPos / 12).floor;
 
@@ -344,19 +353,31 @@ BigramWindow : QWindow {
 		^[this.getMouseXPosition(x),this.getMouseYPosition(y)]
 	}
 
-	getMouseXPosition { |x|
-		//calculates time subdivision from mouse position and offsets
-		//numeration starts at 0
+	getMouseXPosition { |x|		//calculates time subdivision from mouse position and offsets
+
 		var pos;
-		if (x > leftSpace) {
-			pos = x - leftSpace; // quit offset
-			pos = pos / beatLineSpace;// <--------- TODO: adjust to be parametrizable!!
-			//adjust to current beat subdivision
-			pos = pos.round(1/beatSubdivision);
+		if (x >= leftSpace) {
+			if (x <= maxRightPosition) {
+
+				// inside lattice
+
+				pos = x - leftSpace; // quit offset
+				pos = pos / beatLineSpace;// <--------- TODO: adjust to be parametrizable!!
+				//adjust to current beat subdivision
+				pos = pos.round(1/beatSubdivision);
+			} {
+
+				// right from lattice
+
+				pos = maxRightPosition;
+			}
 		} {
-			//mouse in the leftspace
+
+			// left from lattice
+
 			pos = 0;
-		}
+		};
+
 
 		^pos;
 	}
@@ -365,19 +386,31 @@ BigramWindow : QWindow {
 		//calculates pitch subdivision from mouse position and offsets
 		//numeration starts at 0 = minimum pitch
 		var pos;
-		if (y > upperSpace) {
-			pos = y - upperSpace;
-			pos = (pos / bigramSubdivisionSpace).round;
+		if (y >= upperSpace) {
+			if (y <= maxDownPosition) {
 
-		} { //TODO: just in case, don't cause an error
+				// inside lattice
+
+				pos = y - upperSpace;
+				pos = (pos / bigramSubdivisionSpace).round;
+			} {
+
+				// below lattice
+
+				pos = maxDownPosition;
+			}
+
+		} {
+
+			// above lattice
+
 			pos = 0;
 		};
-		//turn numeration start
-		if (pos.isNil.not) {
-			pos = (numOctaves * 12) - pos;
-			//TODO
-			if (pos < 0) {pos=0};
-		}
+
+		// turn up-down for convenience
+		pos = (numOctaves * 12) - pos;
+
+
 		^pos;
 	}
 
@@ -420,7 +453,7 @@ BigramWindow : QWindow {
 				Pen.width = 1;
 			};
 
-			Pen.addArc(xPos@yPos,beatLineSpace/2/beatSubdivision,0,2pi);
+			Pen.addArc(xPos@yPos,circleRadius,0,2pi);
 			Pen.fillStroke;
 		}
 	}
@@ -434,4 +467,5 @@ BigramWindow : QWindow {
 
 
 }
+
 
