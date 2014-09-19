@@ -1,6 +1,7 @@
 Bigram {
 
 	var <notes;
+	var <eventStreamPlayer;
 
 	*new {
 		^super.new.init;
@@ -9,6 +10,7 @@ Bigram {
 	init {
 		notes = List.new;
 	}
+
 
 	putNote{ |note|
 		notes.add(note)
@@ -24,6 +26,10 @@ Bigram {
 
 	getAllNotes{
 		^notes
+	}
+
+	removeAllNotes {
+		notes = List.new;
 	}
 
 	getNotesAt { |beat, relativePos|
@@ -195,10 +201,12 @@ Bigram {
 
 		#degrees,durations = this.createPatterns;
 
-		Pbind(
-			\midinote, Pseq(degrees, 1),
+		// we use eventStreamPlayer to monitor from outside if it's playing
+		eventStreamPlayer=Pbind(
+			\midinote, Pseq(degrees - 3, 1), // bigram main line is A, but is internally coded as 0 (C)
 			\dur, Pseq(durations, 1),
 		).play;
+
 
 	}
 
@@ -256,11 +264,52 @@ Bigram {
 
 				var simultaneousNote = orderedDegrees.at(orderedIndex+1);
 				orderedDegrees.removeAt(orderedIndex+1);
-					orderedDegrees.put(orderedIndex,[orderedDegrees.at(orderedIndex),simultaneousNote].flat);
+				orderedDegrees.put(orderedIndex,[orderedDegrees.at(orderedIndex),simultaneousNote].flat);
 			}
 		};
 
 		^[orderedDegrees.asArray,durations.asArray]
+	}
+
+
+	///// SAVE AND LOAD //////
+
+	saveBigram { |fileName = "bigram"|
+
+		var file = File.new(fileName,"w");
+
+		notes.do { |note|
+			file.write(note.height.asString);
+			file.write(",");
+			file.write(note.pitchClass.asString);
+			file.write(",");
+			file.write(note.beat.asString);
+			file.write(",");
+			file.write(note.relativePos.asString);
+			file.write("\n");
+		};
+
+		file.close;
+	}
+
+	loadBigram { |fileName|
+
+		// load content into file var
+		var file = CSVFileReader.read(fileName);
+
+		// remove all notes
+		this.removeAllNotes;
+
+		// place new notes
+
+		file.do { |line|
+			var height = line[0].asFloat;
+			var pitchClass = line[1].asFloat;
+			var beat = line[2].asFloat;
+			var relativePos = line[3].asFloat;
+
+			this.putNote(BigramNote(height,pitchClass,beat,relativePos));
+		};
 	}
 }
 
@@ -288,7 +337,7 @@ BigramNote {
 	}
 
 	getType {
-		if (pitchClass.asInt.even) {
+		if (pitchClass.asInt.odd) {
 			^\w;
 		} {
 			^\b;
