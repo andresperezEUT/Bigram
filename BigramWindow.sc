@@ -7,7 +7,12 @@ BigramWindow : QWindow {
 	var <bigramView;
 	var insertButton, editButton;
 	var buttonList;
+	var playButton;
+	var showBigramSubdivisionButton, showBigramSubdivision;
 	var beatSubdivisionMenu;
+
+	var saveButton;
+	var loadButton;
 
 	var <elementSize = 30;
 	var <bigramSpace = 30; //vertical
@@ -52,6 +57,8 @@ BigramWindow : QWindow {
 
 		numBeats = myNumBeats ? 16;
 
+		showBigramSubdivision = false;
+
 		bigramSubdivisionSpace = bigramSpace / 6;  //(2 bigramSpace in a octave)
 
 		mode = \insert;
@@ -75,9 +82,57 @@ BigramWindow : QWindow {
 		insertButton.action_({|b| buttonList.do{|e|e.value=0}; b.value=1; mode=\insert; bigram.deselectAllNotes; this.refresh });
 		editButton.action_({| b|buttonList.do{|e|e.value=0}; b.value=1; mode=\edit; this.refresh });
 
+
+		//// play button -> outside of buttonList (not a mode button)
+		playButton = Button(this, Rect(3*elementSize, 0, elementSize, elementSize));
+		playButton.states = [["P", Color.blue, Color.white]/*,["P", Color.white, Color.blue(0.75)]*/];
+
+		playButton.action_({ |b|
+			if (this.bigram.eventStreamPlayer.isPlaying.not) {
+				this.bigram.play;
+			};
+		});
+
+		// showBigramSubdivisionButton
+
+		showBigramSubdivisionButton = Button (this, Rect(5*elementSize, 0, elementSize, elementSize));
+		showBigramSubdivisionButton.states = [["s", Color.grey, Color.white], ["s", Color.white, Color.grey]];
+		showBigramSubdivisionButton.action_({ |b|
+			if (b.value == 0) {
+				showBigramSubdivision = false;
+			} {
+				showBigramSubdivision = true;
+			};
+			this.refresh;
+		});
+
+
+		// SAVE AND LOAD FILES
+
+		saveButton = Button(this, Rect(9*elementSize, 0, 2*elementSize, elementSize));
+		saveButton.states = [["save", Color.grey, Color.white]];
+		saveButton.action_({
+			Dialog.savePanel({ |path|
+				this.bigram.saveBigram(path);
+				("File " ++ path ++ " saved").postln;
+
+				});
+		});
+
+		loadButton = Button(this, Rect(11*elementSize, 0, 2*elementSize, elementSize));
+		loadButton.states = [["load", Color.grey, Color.white]];
+		loadButton.action_({
+			Dialog.openPanel({ |path|
+				this.bigram.loadBigram(path);
+				("File " ++ path ++ " opened").postln;
+				this.refresh;
+				});
+
+		});
+
 		// instanciate subdivision menu
 
-		beatSubdivisionMenu = PopUpMenu(this,Rect(2*elementSize,0,2*elementSize,elementSize));
+		beatSubdivisionMenu = PopUpMenu(this,Rect(6*elementSize,0,2*elementSize,elementSize));
 		beatSubdivisionMenu.items = ["1","2","3","4","5","6","7","8"];
 		beatSubdivisionMenu.value = beatSubdivision - 1; //starts in 0
 		beatSubdivisionMenu.action = { |menu|
@@ -143,12 +198,15 @@ BigramWindow : QWindow {
 		// bigram subdivisions
 		//
 
-		Pen.strokeColor = Color.red;
-		Pen.width = 0.2;
-		(12 * numOctaves).do {|i| //12 subdivisions per octave
-			Pen.line(leftSpace@(i*bigramSubdivisionSpace+upperSpace),maxRightPosition@(i*bigramSubdivisionSpace+upperSpace))
+		if (showBigramSubdivision) {
+
+			Pen.strokeColor = Color.red;
+			Pen.width = 0.2;
+			(12 * numOctaves).do {|i| //12 subdivisions per octave
+				Pen.line(leftSpace@(i*bigramSubdivisionSpace+upperSpace),maxRightPosition@(i*bigramSubdivisionSpace+upperSpace))
+			};
+			Pen.stroke;
 		};
-		Pen.stroke;
 
 		//
 		//
@@ -464,6 +522,7 @@ BigramWindow : QWindow {
 		Pen.addRect(selectionRectangle);
 		Pen.fill;
 	}
+
 
 
 }
