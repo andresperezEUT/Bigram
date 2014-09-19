@@ -65,6 +65,8 @@ BigramWindow : QWindow {
 
 		bigram = Bigram.new;
 
+		GUI.qt; // osx compatibility
+
 
 		// instanciate buttons
 
