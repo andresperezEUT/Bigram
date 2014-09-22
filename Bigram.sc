@@ -431,11 +431,11 @@ BigramNote {
 	}
 
 	isAfter { |myBeat,myRelativePos|
-		if (BigramNote.getAbsPos(myBeat,myRelativePos) < this.absPos) {^true} {^false}
+		if (BigramNote.getAbsPos(myBeat,myRelativePos) <= this.absPos) {^true} {^false}
 	}
 
 	isBefore { |myBeat,myRelativePos|
-		if (BigramNote.getAbsPos(myBeat,myRelativePos) > this.absPos) {^true} {^false}
+		if (BigramNote.getAbsPos(myBeat,myRelativePos) >= this.absPos) {^true} {^false}
 	}
 
 	atPitch { |myHeight, myClass|
@@ -443,11 +443,11 @@ BigramNote {
 	}
 
 	isHigher { |myHeight, myClass|
-		if (BigramNote.getAbsPitch(myHeight,myClass) < this.absPitch) {^true} {^false}
+		if (BigramNote.getAbsPitch(myHeight,myClass) <= this.absPitch) {^true} {^false}
 	}
 
 	isLower { |myHeight, myClass|
-		if (BigramNote.getAbsPitch(myHeight,myClass) > this.absPitch) {^true} {^false}
+		if (BigramNote.getAbsPitch(myHeight,myClass) >= this.absPitch) {^true} {^false}
 	}
 
 	sameAs { |aNote|
