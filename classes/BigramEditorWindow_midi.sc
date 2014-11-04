@@ -60,7 +60,15 @@
 			// connect to the default midi synthesizer (only proved in windows 7)
 			midiOut = MIDIOut.newByName("Microsoft MIDI Mapper","Microsoft MIDI Mapper");
 		}
-		// TODO: look for other platforms
+		{\osx} {
+			// init midiClient if it was not instanciated
+			if (MIDIClient.sources.isNil) {
+				MIDIClient.init;
+			};
+
+			// connect to the default midi synthesizer (not proved!!)
+			midiOut = MIDIOut(0);
+		}
 		;
 	}
 
