@@ -73,20 +73,3 @@
 	}
 
 }
-
-// MIDIClient.sources
-////////// comment below
-/*
-"qsynth".unixCmd;
-MIDIClient.init
-m = MIDIOut(0);
-
-MIDIClient.restart
-MIDIClient.destinations.do(_.postln)
-~dest=MIDIClient.destinations;
-~dest.do{|d,i|
-	var name = d.name;
-	name = name.split($ );
-	if (name[0] == "FLUID") {i.postln}
-}
-*/
