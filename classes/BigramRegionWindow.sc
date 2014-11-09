@@ -17,9 +17,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-BigramRegionWindow : QWindow {
+BigramRegionWindow  {
 	//
 	// 	var <bigramView;
+
+	var <window;
 	var insertButton, editButton;
 	var buttonList;
 	var playButton;
@@ -86,9 +88,18 @@ BigramRegionWindow : QWindow {
 	var <barsFromPulses;
 	var <pulsesFromPulseIndex;
 
-	var <bpdList;
 
 	var <holdSelection = false;
+
+	var optionsView;
+	var optionsView_height;
+	var canvasView;
+	var canvasLeftMargin; // harcoded somewhere to pulseWidth/2
+
+	var duplicateButton;
+
+	var <>windowIndex;
+	var <>trackName;
 
 	//gui
 	// var <showBigramSubdivision;
@@ -97,101 +108,63 @@ BigramRegionWindow : QWindow {
 	// 	var <maxRightPosition, <maxDownPosition;
 	//
 	//
-	*new { |editorWindow,track,region,regionName|
-		^super.new("Bigram Region Editor",scroll:true).init(editorWindow,track,region,regionName);
+	*new { |editorWindow,track,trackName,region,regionName,windowIndex|
+		^super.new.init(editorWindow,track,trackName,region,regionName,windowIndex);
 	}
 
-	init  { |myEditorWindow, myTrack, myRegion, myRegionName|
+	reload {
+		track = editor.bigramEditor.bigramTracks.at(editor.bigramEditor.bigramTrackNames.indexOf(trackName));
+		region = track.bigramRegions.at(track.bigramRegionNames.indexOf(regionName));
+		window.refresh;
+	}
+
+	init  { |myEditorWindow, myTrack, myTrackName, myRegion, myRegionName,myWindowIndex|
+
+		windowIndex = myWindowIndex;
+		window = Window.new("Bigram Region Editor " ++ windowIndex.asString);
 
 		// configure
-		this.front;
-		this.view.hasBorder_(false);
-		this.view.autohidesScrollers_(true);
+		window.front;
+		window.view.onResize = {
+			this.recalculateViewSize;
+		};
+
+		window.onClose = {
+			editor.bigramRegionWindowList.remove(this);
+		};
+		// window.view.hasBorder_(false);
+
 		//get reference to the region and the bigram editor window
 		editor = myEditorWindow;
 		track = myTrack;
+		trackName = myTrackName;
 		region = myRegion;
 		regionName = myRegionName;
+
 
 		numOctaves = editor.bigramEditor.numOctaves;
 
 		startBPD = region.startBPD;
 		endBPD = region.endBPD;
 
-		/*startPulseIndex = editor.bigramEditor.getPulseIndexFromBPD(startBPD);
-		endPulseIndex = editor.bigramEditor.getPulseIndexFromBPD(endBPD);*/
-
 		numPulses = region.numPulses;
 
 		showBigramSubdivision = false;
 
-		// get division structure
 
-		/*barsFromPulses = editor.bigramEditor.barsFromPulses[startPulseIndex..endPulseIndex];*/
-
-
-		/*		divisionsFromPulses = Array.new(numPulses);
-		numPulses.do { |pulse|
-		var bar = barsFromPulses.at(pulse);
-		var divisionsAtBar = editor.bigramEditor.measuresFromBars.at(bar).division;
-		divisionsFromPulses.add(divisionsAtBar);
-		};*/
-
-		/*		pulsesFromPulseIndex = List.new;
-		{
-		var lastBar;
-		var pulse;
-		barsFromPulses.do { |bar,pulseIndex|
-		if (pulseIndex == 0) {
-		pulse = startBPD.pulse;
-		} {
-		if (bar == lastBar) {
-		pulse = pulse + 1;
-		} {
-		pulse = 0;
-		}
-		};
-		pulsesFromPulseIndex.add(pulse);
-		lastBar = bar;
-		};
-		}.value();*/
-
-		/*		bpdList = List.new;
-		divisionsFromPulses.do{ |divisions,pulseIndex|
-		divisions.do { |d|
-		var bar = barsFromPulses.at(pulseIndex);
-		bpdList.add(BPD.new(bar,pulsesFromPulseIndex[pulseIndex],d))
-		}
-		};*/
-
-		/*		bpdList.do(_.print);*/
-
-
-
-		//
-		// 	init { |myNumBeats|
-		// 		var width = this.bounds.width;
-		// 		var height = this.bounds.height;
-		//
-		// 		numBeats = myNumBeats ? 16;
-		//
 		showBigramSubdivision = false;
-		//
-		// 		bigramSubdivisionSpace = bigramSpace / 6;  //(2 bigramSpace in a octave)
-		//
-		mode = \insert;
-		//
-		// 		bigram = Bigram.new;
-		//
-		// 		GUI.qt; // osx compatibility
-		//
-		//
-		// 		// instanciate buttons
-		//
-		insertButton = Button(this, Rect(0, 0, elementSize, elementSize));
-		editButton = Button(this, Rect(elementSize, 0, elementSize, elementSize));
 
-		buttonList=List.new;
+		mode = \insert;
+
+		////// options bar
+		optionsView_height = elementSize; /*window.bounds.height / 8;*/
+		optionsView = CompositeView(window,Rect(0,0,window.bounds.width,optionsView_height));
+		optionsView.background_(Color.grey(0.2));
+
+		insertButton = Button(optionsView, Rect(0, 0, elementSize, elementSize));
+		editButton = Button(optionsView, Rect(elementSize, 0, elementSize, elementSize));
+
+		buttonList=List.new; // only insert and edit
 		buttonList.add(insertButton);
 		buttonList.add(editButton);
 
@@ -204,22 +177,26 @@ BigramRegionWindow : QWindow {
 		insertButton.value_(1); //TODO: this is not working!!
 		editButton.value_(0);
 
+/*		duplicateButton = Button(optionsView, Rect(2*elementSize, 0, elementSize, elementSize));
+		duplicateButton.states = [["d", Color.blue, Color.grey(0.9)]];
+		duplicateButton.action_({ region.duplicateSelectedNotes	});*/
+
 
 		//// play button -> outside of buttonList (not a mode button)
-		playButton = Button(this, Rect(3*elementSize, 0, elementSize, elementSize));
+		playButton = Button(optionsView, Rect(4*elementSize, 0, elementSize, elementSize));
 		playButton.states = [["P", Color.blue, Color.grey(0.9)]/*,["P", Color.white, Color.blue(0.75)]*/];
 
 		playButton.action_({ |b|
 			var pbind = region.createPatterns;
 			pbind.play;
-/*			if (region.eventStreamPlayer.isPlaying.not) {
-				region.play;
+			/*			if (region.eventStreamPlayer.isPlaying.not) {
+			region.play;
 			};*/
 		});
 
 		// showBigramSubdivisionButton
 
-		showBigramSubdivisionButton = Button (this, Rect(5*elementSize, 0, elementSize, elementSize));
+		showBigramSubdivisionButton = Button (optionsView, Rect(5*elementSize, 0, elementSize, elementSize));
 		showBigramSubdivisionButton.states = [["s", Color.grey, Color.white], ["s", Color.white, Color.grey]];
 		showBigramSubdivisionButton.action_({ |b|
 			if (b.value == 0) {
@@ -231,7 +208,7 @@ BigramRegionWindow : QWindow {
 		});
 
 
-		zoomSlider = Slider2D.new(this, Rect(8*elementSize,0,elementSize*4,elementSize)).x_(0.5).y_(0.5);
+		zoomSlider = Slider2D.new(optionsView, Rect(7*elementSize,0,elementSize*4,elementSize)).x_(0.5).y_(0.5);
 		zoomSlider.action_({ |slider|
 
 			pulseWidth = slider.x.linlin(0,1,10,90);
@@ -242,88 +219,23 @@ BigramRegionWindow : QWindow {
 		});
 
 
-/*		zoomPlusHButton = Button(this,Rect(8*elementSize,0,elementSize,elementSize));
-		zoomPlusHButton.states_([["+",Color.black,Color.grey(0.9)]]);
-		zoomPlusHButton.action_({
-			// change pulse width
-			pulseWidth = pulseWidth + 10;
-			// resize canvas
-			this.resizeCanvas;
-		});
+		///// canvas view: parent of bigramView
+		canvasView = ScrollView(window,Rect(0,optionsView_height,window.bounds.width, window.bounds.height - optionsView_height));
+		canvasView.autohidesScrollers_(false);
+		canvasView.hasBorder_(false);
+		canvasView.background_(Color.grey(0.4));
 
-		zoomMinusHButton = Button(this,Rect(9*elementSize,0,elementSize,elementSize));
-		zoomMinusHButton.states_([["-",Color.black,Color.grey(0.9)]]);
-		zoomMinusHButton.action_({
-			// change pulse width
-			pulseWidth = pulseWidth - 10;
-			// resize canvas
-			this.resizeCanvas;
-		});
-
-		zoomPlusVButton = Button(this,Rect(11*elementSize,0,elementSize,elementSize));
-		zoomPlusVButton.states_([["+",Color.black,Color.grey(0.9)]]);
-		zoomPlusVButton.action_({
-			// change pulse width
-			bigramHeight = bigramHeight + 10;
-			// resize canvas
-			this.resizeCanvas;
-		});
-
-		zoomMinusVButton = Button(this,Rect(12*elementSize,0,elementSize,elementSize));
-		zoomMinusVButton.states_([["-",Color.black,Color.grey(0.9)]]);
-		zoomMinusVButton.action_({
-			// change pulse width
-			bigramHeight = bigramHeight - 10;
-			// resize canvas
-			this.resizeCanvas;
-		});*/
-
-		//
-		//
-		// 		// SAVE AND LOAD FILES
-		//
-		// 		saveButton = Button(this, Rect(9*elementSize, 0, 2*elementSize, elementSize));
-		// 		saveButton.states = [["save", Color.grey, Color.white]];
-		// 		saveButton.action_({
-		// 			Dialog.savePanel({ |path|
-		// 				this.bigram.saveBigram(path);
-		// 				("File " ++ path ++ " saved").postln;
-		//
-		// 			});
-		// 		});
-		//
-		// 		loadButton = Button(this, Rect(11*elementSize, 0, 2*elementSize, elementSize));
-		// 		loadButton.states = [["load", Color.grey, Color.white]];
-		// 		loadButton.action_({
-		// 			Dialog.openPanel({ |path|
-		// 				this.bigram.loadBigram(path);
-		// 				("File " ++ path ++ " opened").postln;
-		// 				this.refresh;
-		// 			});
-		//
-		// 		});
-		//
-		// 		// instanciate subdivision menu
-		//
-		// 		beatSubdivisionMenu = PopUpMenu(this,Rect(6*elementSize,0,2*elementSize,elementSize));
-		// 		beatSubdivisionMenu.items = ["1","2","3","4","5","6","7","8"];
-		// 		beatSubdivisionMenu.value = beatSubdivision - 1; //starts in 0
-		// 		beatSubdivisionMenu.action = { |menu|
-		// 			beatSubdivision = menu.items[menu.value].asInt;
-		// 			this.refresh;
-		// 		};
-		//
 
 
 		// bigram view limits
 		bigramView_height = bigramHeight * numOctaves;
-		bigramView_width = pulseWidth * (numPulses );
+		bigramView_width = pulseWidth * (numPulses + 0.5);
 
-		/*		maxRightPosition = leftSpace + (numBeats * beatLineSpace);
-		maxDownPosition = upperSpace + ((2*numOctaves) * bigramSpace);*/
-		//
+
 		// instanciate view
-		bigramView = UserView(this,Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height)).background_(Color.white);
+		bigramView = UserView(canvasView,Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height)).background_(Color.white);
+
+		// bigramView = UserView(this,Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height)).background_(Color.white);
 
 		bigramView.drawFunc = {
 			this.drawBigram;
@@ -331,11 +243,9 @@ BigramRegionWindow : QWindow {
 			this.drawSelectionRectangle;
 			editor.updateView; // update note changes in the bigram editor window
 		};
-		//
-		//
-		//
-		//
-		// 		// define actions
+
+
+		// define actions
 		//
 		bigramView.mouseDownAction = this.mouseDownAction;
 		bigramView.mouseMoveAction = this.mouseMoveAction;
@@ -343,31 +253,24 @@ BigramRegionWindow : QWindow {
 		//
 		bigramView.keyDownAction = this.keyDownAction;
 		bigramView.keyUpAction = this.keyUpAction;
-		//
-		// 	}
-		//
-		// 	setBeatSubdivision { |newBeatSubdivision|
-		// 		beatSubdivision = newBeatSubdivision;
-		// 		this.refresh;
-		// 	}
-		//
-		//
+
 
 	}
 
 	resizeCanvas {
 		bigramView_height = bigramHeight * numOctaves;
-		bigramView_width = pulseWidth * (numPulses );
+		bigramView_width = pulseWidth * (numPulses + 0.5); // half pulse more for view
 		bigramView.bounds_(Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height));
 		this.refresh;
 
 	}
 
 	drawBigram {
-		var width = this.bounds.width;
-		var height = this.bounds.height;
+		var width = window.bounds.width;
+		var height = window.bounds.height;
 
 		var numBeatSubdivisionsToDraw, beatSubdivisionLineSpace;
+		var subdivisionHeight;
 
 		/////////// HORIZONTAL LINES ////////////
 		//
@@ -391,16 +294,15 @@ BigramRegionWindow : QWindow {
 		// bigram subdivisions
 		//
 
+		subdivisionHeight = bigramHeight / 6;
 		if (showBigramSubdivision) {
-
-			var subdivisionHeight = bigramHeight / 6;
 
 			Pen.strokeColor = Color.red;
 			Pen.width = 0.2;
 			(12 * numOctaves).do {|i| //12 subdivisions per octave
 
 				Pen.line(0@(i*subdivisionHeight), bigramView_width@(i*subdivisionHeight));
-				/*Pen.line(leftSpace@(i*bigramSubdivisionSpace+upperSpace),maxRightPosition@(i*bigramSubdivisionSpace+upperSpace))*/
+
 			};
 			Pen.stroke;
 		};
@@ -410,13 +312,15 @@ BigramRegionWindow : QWindow {
 		// //
 		///////// VERTICAL LINES ////////////
 
+		// avoid computation due to left margin
+		Pen.translate(pulseWidth*0.5,0);
+
 		// pulse lines
 
 		Pen.strokeColor = Color.black;
 		Pen.width = 0.4;
 		(numPulses+1).do{ |i|
 			Pen.line((i*pulseWidth)@0,(i*pulseWidth)@bigramView_height);
-			// Pen.line((i*beatLineSpace+leftSpace)@upperSpace,(i*beatLineSpace+leftSpace)@maxDownPosition);
 		};
 		Pen.stroke;
 
@@ -427,8 +331,8 @@ BigramRegionWindow : QWindow {
 		region.divisionsFromPulses.do{ |divisions,pulse|
 			divisions.do { |d|
 				Pen.line(
-					Point((pulse*pulseWidth)+(d*pulseWidth/divisions),0),
-					Point((pulse*pulseWidth)+(d*pulseWidth/divisions),bigramView_height)
+					Point((pulse*pulseWidth)+((d)*pulseWidth/divisions),0),
+					Point((pulse*pulseWidth)+((d)*pulseWidth/divisions),bigramView_height)
 				);
 			}
 		};
@@ -447,23 +351,95 @@ BigramRegionWindow : QWindow {
 		};
 		Pen.stroke;
 
+		Pen.translate(pulseWidth*0.5.neg,0);
+
+		// grey left margin
+		// /2 because hardcoded above (+ 0.5) in resizeCanvas
+		Pen.addRect(Rect(0,0,pulseWidth/2,bigramView_height));
+		Pen.fillColor = Color.grey(0.8,alpha:0.5);
+		Pen.fill;
+
+		// piano roll
+		Pen.fillColor = Color.black;
+		Pen.strokeColor = Color.black;
+		Pen.addRect(Rect.fromPoints( Point(0,0), Point(pulseWidth/4,bigramView_height) ));
+		Pen.fill;
+
+		Pen.translate(0,subdivisionHeight/4);
+		Pen.fillColor = Color.white;
+		(bigramView_height / subdivisionHeight).do { |i|
+			var height = i * subdivisionHeight;
+			Pen.addRect(Rect(0,height,pulseWidth/4,subdivisionHeight/2));
+			Pen.fillStroke;
+		};
+		Pen.translate(0,subdivisionHeight/2.neg);
+		// octave numbers
+		numOctaves.do { |i|
+			if (i > 0) {
+				var y  = i * bigramHeight;
+				var string = (i - numOctaves).abs.asString;
+				Pen.stringAtPoint(string,Point(0,y),Font("Helvetica-Bold", 20),Color.red);
+			}
+		};
+		Pen.translate(0,subdivisionHeight/4);
+
 
 	}
 
 	// get a bigramCoordinate [bpd,absPitch]
 	getBigramNote { |x,y|
+		// var aa ="region bpdList";
+		// var a = region.bpdList.do(_.print);
+
 		var pulseDivisionWidth = pulseWidth / 2;
 		var bigramDivisionHeight = bigramHeight / 12;
 
-		var divisionIndex = (x / pulseDivisionWidth).round;
+		var bpd, pitch;
+		var divisionIndex;
+		// var divisionIndex = (x / pulseDivisionWidth).round;
 		var yPos = ((numOctaves * 12) - (y / bigramDivisionHeight)).round;
 
+		if (x / pulseWidth < 0.25) { // piano roll
+			// if ((x / pulseWidth / 2) < 0 ) { // avoid left margin
+			"left".postln;
+			divisionIndex = 0;
+		} {
+			// var a = "pulseIndex".postln;
+			var pulseIndex = ((x/pulseWidth) - 0.5).abs.trunc;
+			var q = ["pulseIndex",pulseIndex].postln;
+
+			// var q = "divisions".postln;
+			// region.divisionsFromPulses.postln;
+			var div = region.divisionsFromPulses.at(pulseIndex);
+			var s = ["div",div].postln;
+
+			var frac = (((x/pulseWidth) - 0.5).abs - pulseIndex);
+			var a = ["frac",frac].postln;
+			var divInPulse = (frac / (1/div)).round/*floor*/;
+			var d = ["divInPulse",divInPulse].postln;
+
+			// get pulse index
+			divisionIndex = 0;
+			(pulseIndex).do { |i| divisionIndex = divisionIndex + region.divisionsFromPulses.at(i)};
+			// region.divisionsFromPulses(0..pulseIndex-1).do{|div| divisionIndex = divisionIndex + div};
+			divisionIndex = divisionIndex + divInPulse;
+			// "res".postln;
+			// divisionIndex.postln;
+
+			// ((x / (pulseWidth/div)) - 1).postln.round.postln;
+
+			/*var divisions = region.bpdList.at(pulseIndex).division.postln;*/
+
+			// var pulseIndex = ((x / pulseWidth)).postln.round.postln;
+			// divisionIndex = ((x / pulseDivisionWidth) - 1).round;
+		};
+
 		// turn xPos into bpd
-		var bpd = region.bpdList.at(divisionIndex.clip(0,region.bpdList.size-1));
-		var pitch = BPitch.new((yPos/12).floor,yPos%12);
+		bpd = region.bpdList.at(divisionIndex.clip(0,region.bpdList.size-1));
+		pitch = BPitch.new((yPos/12).floor,yPos%12);
 		// "+++".postln;
 
-		^BigramNote.new(pitch,bpd);
+		^BigramNote.new(pitch.print,bpd.print);
 	}
 
 
@@ -471,114 +447,53 @@ BigramRegionWindow : QWindow {
 		var note, noteIndex;
 		lastMouseDownPosition = Point(x,y);
 
-		// [x,y] are the mouse down coordinates, in pixels
-		// [xPos,yPos] are the bigram coordinates, in the form (absolutePos,totalPitch)
-		note = this.getBigramNote(x,y);
-		noteIndex = region.hasNote(note);
+		/*		"pointer".postln;
+		[x,y].postln;*/
 
-		/*		"mousePosition: ".post;
-		[x,y].postln;
-		"bigramPosition: ".post;
-		[xPos,yPos].postln;*/
+		if ( x < (pulseWidth/2) ) {
+			// click on piano: only listen
+			note = this.getBigramNote(x,y);
+			this.testNote(note);
 
-		switch (mode)
-		{\insert} {
-			region.deselectAllNotes;
-			// if there is no note, place one
-			if (noteIndex.isNil) {
-				note.isSelected_(true);
-				region.putNote(note);
-			} {
-				// if there is note, remove it
-				region.removeNoteAt(noteIndex);
-			}
-		}
-		{\edit} {
-			// region.deselectAllNotes;
-			if (noteIndex.isNil.not) {
-				noteSelectedInLastDown = noteIndex;
-				// if there is note, [de]select it
-				// region.getNoteAt(noteIndex).isSelected_(region.getNoteAt(noteIndex).isSelected.not);
-			} {
-				// if not, start selection area
-				noteSelectedInLastDown = nil;
-			}
-		};
-
-		/*		"```".postln;
-		bpdList.do(_.print);*/
-		// region.notes;
-
-		/*switch (mode)
-
-		/////////////////////////// INSERT MODE /////////////////////
-		{\insert} {
-		//create new BigramNote
-		var newNote, noteIndex;
-		var pitchClass, height;
-		var beat, relativePos;
-
-		//calculate vertical position
-		pitchClass = yPos % 12;
-		height = (yPos / 12).floor;
-
-		//calculate horizontal position
-
-		beat = xPos.trunc;
-		relativePos = xPos - beat;
-
-		newNote = BigramNote.new(height,pitchClass,beat,relativePos);
-
-		noteIndex = bigram.noteIndex(newNote);
-
-		if (noteIndex.isNil) {
-		//if there is no the same note in the same place, put the new note
-		bigram.putNote(newNote)
 		} {
-		// if the is note, remove it
-		bigram.removeNoteAt(noteIndex);
-		};
+			// [x,y] are the mouse down coordinates, in pixels
+			// [xPos,yPos] are the bigram coordinates, in the form (absolutePos,totalPitch)
+			note = this.getBigramNote(x,y);
+			noteIndex = region.hasNote(note);
+
+			/*		"mousePosition: ".post;
+			[x,y].postln;
+			"bigramPosition: ".post;
+			[xPos,yPos].postln;*/
+
+			switch (mode)
+			{\insert} {
+				region.deselectAllNotes;
+				// if there is no note, place one
+				if (noteIndex.isNil) {
+					note.isSelected_(true);
+					region.putNote(note);
+					// send test note
+					this.testNote(note);
+				} {
+					// if there is note, remove it
+					region.removeNoteAt(noteIndex);
+				}
+			}
+			{\edit} {
+				// region.deselectAllNotes;
+				if (noteIndex.isNil.not) {
+					noteSelectedInLastDown = noteIndex;
+					// if there is note, [de]select it
+					// region.getNoteAt(noteIndex).isSelected_(region.getNoteAt(noteIndex).isSelected.not);
+				} {
+					// if not, start selection area
+					noteSelectedInLastDown = nil;
+				}
+			};
+
+			this.refresh;
 		}
-
-		/////////////////////////// EDIT MODE /////////////////////
-		{\edit} {
-		var newNote, noteIndex;
-		var pitchClass, height;
-		var beat, relativePos;
-
-		//calculate vertical position
-		pitchClass = yPos % 12;
-		height = (yPos / 12).floor;
-
-		//calculate horizontal position
-
-		beat = xPos.trunc;
-		relativePos = xPos - beat;
-
-		// if there is a note in that position, select/deselect it
-		newNote = BigramNote(height,pitchClass,beat,relativePos);
-		noteIndex = bigram.noteIndex(newNote);
-		if (noteIndex.isNil.not) {
-
-		noteSelectedInLastDown = true;
-
-		newNote = bigram.getNoteAt(noteIndex); // newNote now points to the existent note instance
-
-		if (newNote.isSelected.not) {
-		//if not selected, select
-		newNote.isSelected_(true)
-		}{
-		//if selectec, deselect
-		newNote.isSelected_(false)
-		}
-		} {
-
-		// if there is no note in that position, create a selection rectangle!
-		noteSelectedInLastDown = false;
-		}
-		}
-		;*/
-		this.refresh;
 	}}
 
 	mouseMoveAction { ^{ |view, x, y, modifiers|
@@ -606,13 +521,15 @@ BigramRegionWindow : QWindow {
 
 				if (diffPitch > 0) {
 					region.moveSelectedNotes(\up,diffPitch)
-				} {
+				};
+				if (diffPitch < 0) {
 					region.moveSelectedNotes(\down,diffPitch.abs)
 				};
 
 				if (diffDiv > 0) {
 					region.moveSelectedNotes(\right,diffDiv.abs)
-				} {
+				};
+				if (diffDiv < 0) {
 					region.moveSelectedNotes(\left,diffDiv.abs)
 				};
 
@@ -633,18 +550,6 @@ BigramRegionWindow : QWindow {
 					region.deselectAllNotes;
 				};
 
-				// [note.print,lastNote.print];
-				/*			"****\n*****************".postln;
-				"BETWEEN".postln;*/
-				/*			region.getNotesBetweenBpd(note.bpd,lastNote.bpd).do{|n|
-				n.isSelected_(true);
-				};
-
-				region.getNotesBetweenPitch(note.pitch,lastNote.pitch).do{|n|
-				n.print;
-				"!ª!!·$!·$!$·!".postln;
-				};*/
-
 				region.getNotesBetween(note,lastNote).do{|n|
 					n.isSelected_(true);
 				};
@@ -656,118 +561,24 @@ BigramRegionWindow : QWindow {
 
 		}
 
-		// if (mode == \edit and:{noteSelectedInLastDown.not}) {
-		// get current bigram coordinate
-		/*			var note = this.getBigramNote(x,y);
-		var lastNote = this.getBigramNote(lastMouseDownPosition.x,lastMouseDownPosition.y);
-
-		// [note.print,lastNote.print];
-		/*			"****\n*****************".postln;
-		"BETWEEN".postln;*/
-		/*			region.getNotesBetweenBpd(note.bpd,lastNote.bpd).do{|n|
-		n.isSelected_(true);
-		};
-
-		region.getNotesBetweenPitch(note.pitch,lastNote.pitch).do{|n|
-		n.print;
-		"!ª!!·$!·$!$·!".postln;
-		};*/
-
-		region.getNotesBetween(note,lastNote).do{|n|
-		n.isSelected_(true);
-		};
-
-		// update selection rectangle
-		selectionRectangle = Rect.fromPoints(lastMouseDownPosition,x@y);
-		this.refresh;*/
-
-		// };
-
 	}}
 
-	//
-	// 	mouseMoveAction { ^{ |view, x, y, modifiers|
-	// 		var selectedNotes, deselectedNotes;
-	// 		var xPos, yPos;
-	//
-	// 		var beat1, relativePos1, beat2, relativePos2;
-	// 		var height1, pitchClass1, height2, pitchClass2;
-	//
-	//
-	// 		if (mode == \edit and:{noteSelectedInLastDown.not}) {
-	//
-	// 			#xPos,yPos = this.getBigramCoordinate(x,y);
-	// 			selectionRectangle = Rect.fromPoints(lastMouseDownPosition,x@y);
-	//
-	// 			// convert to required separate format
-	// 			#beat1,relativePos1 = BigramNote.getRelativePos(this.getMouseXPosition(lastMouseDownPosition.x));
-	// 			#beat2,relativePos2 = BigramNote.getRelativePos(xPos);
-	// 			#height1,pitchClass1 = BigramNote.getRelativePitch(this.getMouseYPosition(lastMouseDownPosition.y));
-	// 			#height2,pitchClass2 = BigramNote.getRelativePitch(yPos);
-	//
-	//
-	// 			// select notes inside the rectangle
-	// 			selectedNotes = bigram.getNotesInRange(beat1, relativePos1, beat2, relativePos2, height1, pitchClass1, height2, pitchClass2);
-	// 			bigram.selectNotes(selectedNotes);
-	//
-	// 			// deselect notes which are now not selected
-	// 			deselectedNotes = List.new; // it could be an array, we know sizes of notes and selectedNotes
-	// 			bigram.notes.do{ |note|
-	// 				if (selectedNotes.indexOf(note).isNil) {
-	// 					deselectedNotes.add(note)
-	// 				}
-	// 			};
-	// 			bigram.deselectNotes(deselectedNotes);
-	//
-	// 			this.refresh;
-	// 		};
-	// 	}}
-	//
 	mouseUpAction { ^{ |view, x, y, modifiers|
 		if (mode == \edit) {
 			selectionRectangle = nil;
-
-			// move notes
-			/*			if (noteSelectedInLastDown.isNil.not) {
-			if (~diffPitch > 0) {
-			region.moveSelectedNotes(\up,~diffPitch)
-			} {
-			region.moveSelectedNotes(\down,~diffPitch.abs)
-			};
-
-			if (~diffDiv > 0) {
-			region.moveSelectedNotes(\right,~diffDiv.abs)
-			} {
-			region.moveSelectedNotes(\left,~diffDiv.abs)
-			};
-			~diffPitch = 0;
-			~diffDiv = 0;
-			};*/
 		};
 		this.refresh;
 
 	}}
 
 
-	// 	mouseUpAction { ^{ |view, x, y, modifiers|
-	// 		if (mode == \edit) {
-	// 			selectionRectangle = nil;
-	// 		};
-	// 		this.refresh;
-	// 	}}
-	//
 	keyDownAction { ^{ |view, char, modifiers, unicode, keycode, key|
 		key.postln;
 		//
 		//global
 		switch (key)
 		{73} {insertButton.valueAction_(1)} // I: insert mode
-		{69} {editButton.valueAction_(1)} //E: edit mode
-		;
-
-		//edit
-		// if (mode==\edit) {
-		switch (key)
+		{69} {editButton.valueAction_(1)} // E: edit mode
 
 		// up arrow: move up 1 semitone selected notes
 		{16777235} {region.moveSelectedNotes(\up,1)}
@@ -786,6 +597,12 @@ BigramRegionWindow : QWindow {
 
 		// control: hold selection
 		{16777249} {holdSelection=true}
+
+		// space: play
+		{32} {region.createPatterns.play}
+
+		// d: duplicate selected notes
+		{68} {region.duplicateSelectedNotes}
 		;
 		// };
 		this.refresh;
@@ -800,103 +617,86 @@ BigramRegionWindow : QWindow {
 		// }
 	}}
 
-	//
-	// 	getBigramCoordinate { |x,y|
-	// 		^[this.getMouseXPosition(x),this.getMouseYPosition(y)]
-	// 	}
-	//
-	// 	getMouseXPosition { |x|		//calculates time subdivision from mouse position and offsets
-	//
-	// 		var pos;
-	// 		if (x >= leftSpace) {
-	// 			if (x <= maxRightPosition) {
-	//
-	// 				// inside lattice
-	//
-	// 				pos = x - leftSpace; // quit offset
-	// 				pos = pos / beatLineSpace;// <--------- TODO: adjust to be parametrizable!!
-	// 				//adjust to current beat subdivision
-	// 				pos = pos.round(1/beatSubdivision);
-	// 			} {
-	//
-	// 				// right from lattice
-	//
-	// 				pos = maxRightPosition;
-	// 			}
-	// 		} {
-	//
-	// 			// left from lattice
-	//
-	// 			pos = 0;
-	// 		};
-	//
-	//
-	// 		^pos;
-	// 	}
-	//
-	// 	getMouseYPosition { |y|
-	// 		//calculates pitch subdivision from mouse position and offsets
-	// 		//numeration starts at 0 = minimum pitch
-	// 		var pos;
-	// 		if (y >= upperSpace) {
-	// 			if (y <= maxDownPosition) {
-	//
-	// 				// inside lattice
-	//
-	// 				pos = y - upperSpace;
-	// 				pos = (pos / bigramSubdivisionSpace).round;
-	// 			} {
-	//
-	// 				// below lattice
-	//
-	// 				pos = maxDownPosition;
-	// 			}
-	//
-	// 		} {
-	//
-	// 			// above lattice
-	//
-	// 			pos = 0;
-	// 		};
-	//
-	// 		// turn up-down for convenience
-	// 		pos = (numOctaves * 12) - pos;
-	//
-	//
-	// 		^pos;
-	// 	}
-	//
+
+	////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////
 
 	getBigramCoordinate { |note|
 
+		// var a = "getBigramCoordinate".postln;
+		// var r = "subdivisionIndex".postln;
 		var subdivisionIndex = region.getSubdivisionIndex(note);
 		// var subdivisionIndex = region.bpdList.indexOf(note.bpd);
 		var absPitch = (numOctaves * 12) - note.pitch.absPitch;
 
-		var x = subdivisionIndex * pulseWidth / 2;
 		var y = absPitch * bigramHeight / 12;
+		var x = 0;
 
+
+
+		// var pulseCount = region.divisionsFromPulses[0];
+		// if (subdivisionIndex < pulseCount) {
+		// 	// subdivision está aqui. calcular x
+		// } {
+		//
+		// };
+		// region.divisionsFromPulses.do { |i|
+		// 	if (subdivisionIndex
+		// 	}
+
+		var finished = false;
+		var acu = 0;
+		var acuDiv = List.new;
+		var divInPulse = subdivisionIndex;
+		region.divisionsFromPulses.do { |div|
+			acuDiv.add(acu);
+			acu = acu + div;
+		};
+		// "acuDiv".postln;
+		// acuDiv.postln;
+
+		(acuDiv.size-1).do { |i|
+			// ["i",i,"subdivisionIndex",subdivisionIndex,"acuDiv[i]",acuDiv[i],"acuDiv[i+1]",acuDiv[i+1]].postln;
+			if (subdivisionIndex >= acuDiv[i] and:{subdivisionIndex < acuDiv[i+1]}) {
+				// está en este slot: calcular posición
+				var div = region.divisionsFromPulses[i];
+				x = x + (pulseWidth/2) + (divInPulse*pulseWidth/div);
+
+				// x = x + (pulseWidth/div) + (divInPulse*pulseWidth/div);
+				// "aqui".postln;
+				finished = true;
+				// ["divInPulse",divInPulse].postln;
+			} {
+				if (finished.not) {
+					var div = region.divisionsFromPulses[i];
+					divInPulse = divInPulse - div;
+					// ["divInPulse",divInPulse].postln;
+					// "sumar 1 pulso".postln;
+					// no está en el slot: sumar 1 pulso
+					x = x + pulseWidth;
+				}
+			};
+		};
+		if (finished.not) {
+			// var q = "NOT FINISHED".postln;
+			var  i = acuDiv.size - 1;
+			var div = region.divisionsFromPulses[i];
+			x = x + (pulseWidth/2) + (divInPulse*pulseWidth/div);
+			// ["divInPulse",divInPulse].postln;
+		};
+		// x.postln;
+		// x = subdivisionIndex + 1 * pulseWidth / 2;
+		// "get bigram coordinate".postln;
 		^[x,y]
-
-		////////
-		/*		var pulseDivisionWidth = pulseWidth / 2;
-		var bigramDivisionHeight = bigramHeight / 12;
-
-		var divisionIndex = (x / pulseDivisionWidth).round;
-		var yPos = ((numOctaves * 12) - (y / bigramDivisionHeight)).round;
-
-		// turn xPos into bpd
-		var bpd = bpdList.at(divisionIndex).print;
-		var pitch = BPitch.new((yPos/12).floor,yPos%12).print;
-		"+++".postln;
-
-		^BigramNote.new(pitch,bpd);*/
 	}
 
 
 	drawNotes {
 		var circleRadius = min(pulseWidth/2,bigramHeight/12);
-		"DRAW NOTES".postln;
+		// "DRAW NOTES".postln;
 
 		region.getAllNotes.do{ |note|
 			var x,y;
@@ -926,52 +726,9 @@ BigramRegionWindow : QWindow {
 			Pen.fillStroke;
 			// note.print;
 
-
-
-
 		}
 	}
-	//
-	// 			var beat = note.beat;
-	// 			var relativePos = note.relativePos;
-	// 			var height = note.height;
-	// 			var pitchClass = note.pitchClass;
-	//
-	// 			var xPos, yPos;
-	// 			var subdivisionTotal = (beat + relativePos) * beatSubdivision;
-	// 			var pitchTotal = (height*12) + pitchClass;
-	// 			//invert pitchTotal for the view
-	// 			pitchTotal = (numOctaves * 12) - pitchTotal;
-	//
-	//
-	// 			xPos = leftSpace + (subdivisionTotal*beatLineSpace/beatSubdivision);
-	// 			yPos = upperSpace + (pitchTotal*bigramSubdivisionSpace);
-	//
-	// 			//draw notes
-	// 			if (note.type == \w) {
-	// 				Pen.fillColor = Color.white;
-	// 			} {
-	// 				Pen.fillColor = Color.black;
-	// 			};
-	//
-	// 			if (mode == \edit){
-	// 				if (note.isSelected) {
-	// 					Pen.strokeColor = Color.blue;
-	// 					Pen.width = 2;
-	// 				} {
-	// 					Pen.strokeColor = Color.black;
-	// 					Pen.width = 1;
-	// 				};
-	// 			} {
-	// 				Pen.strokeColor = Color.black;
-	// 				Pen.width = 1;
-	// 			};
-	//
-	// 			Pen.addArc(xPos@yPos,circleRadius,0,2pi);
-	// 			Pen.fillStroke;
-	// 		}
-	// 	}
-	//
+
 
 	drawSelectionRectangle {
 		Pen.color = Color.blue;
@@ -982,6 +739,26 @@ BigramRegionWindow : QWindow {
 	//
 	//
 	//
+
+	refresh {
+		canvasView.refresh;
+	}
+
+	recalculateViewSize {
+		optionsView.bounds_(Rect(0,0,window.bounds.width,optionsView_height));
+		canvasView.bounds_(Rect(0,optionsView_height,window.bounds.width, window.bounds.height - optionsView_height));
+		this.refresh;
+
+	}
+
+	testNote { |note|
+		Task{
+			// -3 because note at the line is A
+			editor.midiOut.noteOn(track.midiChannel,note.pitch.absPitch-3,127);
+			0.5.wait;
+			editor.midiOut.noteOff(track.midiChannel,note.pitch.absPitch-3,127);
+		}.play;
+	}
 }
 //
 //
