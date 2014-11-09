@@ -27,9 +27,8 @@
 
 		switch(thisProcess.platform.name)
 		{\linux} {
+			Task{
 				var fluidIndex;
-
-
 				// start qsynth
 				"qsynth".unixCmd; // if it's open it won't do nothing
 
@@ -39,7 +38,7 @@
 				};
 				midiOut = MIDIOut(0); // TODO: check for compatibility!!
 
-				// 5.wait; //give it some time...
+				2.wait; //give it some time...
 
 				// get midi index from fluidSynth
 				MIDIClient.destinations.do{|d,i|
@@ -50,6 +49,7 @@
 
 				// connect (from insice sc)
 				midiOut.connect(fluidIndex);
+			}.play;
 		}
 		{\windows} {
 			// init midiClient if it was not instanciated
@@ -59,6 +59,7 @@
 
 			// connect to the default midi synthesizer (only proved in windows 7)
 			midiOut = MIDIOut.newByName("Microsoft MIDI Mapper","Microsoft MIDI Mapper");
+
 		}
 		{\osx} {
 			// init midiClient if it was not instanciated
@@ -72,4 +73,24 @@
 		;
 	}
 
+
+
+
 }
+
+// MIDIClient.sources
+////////// comment below
+/*
+"qsynth".unixCmd;
+MIDIClient.init
+m = MIDIOut(0);
+
+MIDIClient.restart
+MIDIClient.destinations.do(_.postln)
+~dest=MIDIClient.destinations;
+~dest.do{|d,i|
+var name = d.name;
+name = name.split($ );
+if (name[0] == "FLUID") {i.postln}
+}
+*/
