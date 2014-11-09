@@ -26,18 +26,18 @@ BigramEditor {
 
 
 	// time-related
-	var <tempos; // a different Integer for each pulse
+	var <>tempos; // a different Integer for each pulse
 	var <>defaultTempo = 120; //in bpm
 
-	var <measures; // a different PD value for each bar
+	var <>measures; // a different PD value for each bar
 	var <>defaultMeasure; // PD(4,2), initialize in init
 
-	var <measuresFromBars; // bars:[PD,PD...]
-	var <numBars;
+	var <>measuresFromBars; // bars:[PD,PD...]
+	var <>numBars;
 
-	var <defaultNumPulses = 32; // total number of pulses
+	var <defaultNumPulses = 0; // total number of pulses
 
-	var <barsFromPulses; // list with the bar number for each pulse
+	var <>barsFromPulses; // list with the bar number for each pulse
 
 	var <numOctaves = 8;
 
@@ -45,6 +45,10 @@ BigramEditor {
 	var <eventStreamPlayer;
 	var <eventStreamPlayerController;
 	var <bigramEditorWindow;
+
+	var <>tmpFilePath;
+	var <>tmpVersion;
+	var <>tmpMaxVersion;
 
 
 	*new { |editorWindow|
@@ -71,9 +75,9 @@ BigramEditor {
 		numBars = (defaultNumPulses/defaultMeasure.pulse).ceil;
 		measuresFromBars = List.newUsing(PD()!numBars);
 
+		tmpFilePath = Platform.defaultTempDir +/+ "bigram_" ++ Date.getDate.stamp;
+		tmpVersion = nil;
 	}
-
-
 
 
 
@@ -145,11 +149,29 @@ BigramEditor {
 	// following methods give a division index of 0
 	getBPDfromPulseIndex { |pulseIndex|
 
-		var bar = this.getBarNumber(pulseIndex);
-		var pulse = barsFromPulses.indicesOfEqual(bar).indexOf(pulseIndex);
-		var division = 0;
+		var bar, pulse, division;
 
-		^BPD.new(bar,pulse,division);
+		// "GET BPD FROM PULSE INDEX".postln;
+		// ["pulseIndex",pulseIndex].postln;
+
+		if ( pulseIndex < barsFromPulses.size) {
+			bar = this.getBarNumber(pulseIndex);
+			// ["bar",bar].postln;
+			// ["indices of bar",barsFromPulses.indicesOfEqual(bar)].postln;
+			barsFromPulses.indicesOfEqual(bar).do { |pulseNum,i|
+				if (pulseNum == pulseIndex) {
+					pulse = i;
+				};
+			};
+			// ["index of pulse",barsFromPulses.indicesOfEqual(bar).indexOf(pulseIndex)].postln;
+			// pulse = barsFromPulses.indicesOfEqual(bar).indexOf(pulseIndex);
+			// ["pulse",pulse].postln;
+			division = 0;
+
+			^BPD.new(bar,pulse,division);
+		} {
+			^nil;
+		}
 	}
 
 	getPulseIndexFromBPD { |bpd|
@@ -168,6 +190,39 @@ BigramEditor {
 		^subdivision;
 	}
 
+	addBars { |bars,measure,tempo,save=true|
+		var lastBarNumber;
+		// append to measuresFromBars
+		numBars = numBars + bars;
+		bars.do{
+			measuresFromBars.add(measure)
+		};
+		//append to barsFromPulses
+		lastBarNumber = barsFromPulses.last ? -1;
+		bars.do { |bar|
+			var barNumber = lastBarNumber + 1 + bar;
+			measure.pulse.do {
+				barsFromPulses.add(barNumber);
+			};
+		};
+		//append to tempos
+		bars.do{
+			measure.pulse.do{
+				tempos.add(tempo ? defaultTempo);
+			};
+		};
+
+		// change canvas width
+		bigramEditorWindow.recalculateBigramCanvasWidth;
+		// refresh view
+		// bigramEditorWindow.updateView;
+
+		if (save) {
+			"save add bars".postln;
+			bigramEditorWindow.saveTmp;
+		};
+	}
+
 
 
 
@@ -175,13 +230,19 @@ BigramEditor {
 	///////////////////////// TRACK MANAGING /////////////////////////
 
 
-	addTrack {
+	addTrack { |save=true|
 		var name = numTotalTracks.asSymbol;
 		bigramTracks.add(BigramTrack.new(this,name));
 		bigramTrackNames.add(numTotalTracks.asSymbol);
 
 		numTracks = numTracks + 1;
 		numTotalTracks = numTotalTracks + 1;
+
+		if (save) {
+			"save add track".postln;
+			bigramEditorWindow.saveTmp;
+		}
+
 		^name;
 	}
 
@@ -234,6 +295,8 @@ BigramEditor {
 			numTracks = numTracks - 1;
 
 			ans = pos;
+
+			bigramEditorWindow.saveTmp;
 		} {
 			("track " ++ trackName ++ " does not exist").warn;
 			ans = nil;
@@ -308,6 +371,195 @@ BigramEditor {
 	}
 
 	setMetronom { |bool|
+
+	}
+
+
+	/////////////////////// IMPORT MIDI //////////////////////////////7
+
+	/////////// IMPORT MIDI /////////////////
+
+	importMidiFile { |path|
+		var notes = List.new;
+		var fracs;
+
+		var pulse;
+		var division;
+
+		var m = SimpleMIDIFile.read(path);
+		var tempo = m.tempo;
+		var measure = m.timeSignatureAsArray;
+		var numTracks = m.tracks;
+		var noteTracks = List.new; // tracks with noteOn events
+		var channelsInTracks = List.new; // channel for each track
+		var fracsInTracks = List.new; //list of tempo fracs for each track
+		var programsInTracks = List.new; // midi program for each track
+
+		var maxPulse;
+		var numBars;
+
+		// get tracks with notes and channels
+		numTracks.do { |track|
+			var hasNoteOn = false;
+			var channel;
+			m.midiTrackEvents(track).do { |e|
+				if (e[2]=='noteOn') {
+					channel = e[3];
+					hasNoteOn = true;
+				};
+			};
+			if (hasNoteOn) {
+				noteTracks.add(track);
+				channelsInTracks.add(channel);
+			};
+		};
+		"noteTracks".postln;
+		noteTracks.postln;
+		"channelsInTracks".postln;
+		channelsInTracks.postln;
+
+		// get programs
+		noteTracks.do { |track|
+			var program;
+			m.midiTrackEvents(track).do { |e|
+				if (e[2]=='program') {
+					program = e[4];
+				};
+			};
+			// default program
+			if (program.isNil) {program=0};
+			programsInTracks.add(program);
+		};
+
+		//get note list
+		noteTracks.do { |track|
+			var frac = List.new;
+			var n = List.new;
+			m.midiTrackEvents(track).do{ |e|
+				//[ trackNumber, absTime, type, channel, val1:pitch, val2 :amp]
+				if (e[2]=='noteOn' and:{e[5]!=0}) { // avoid note offs
+					n.add([m.beatAtTime(e[1]),e[4],e[5]]);
+					frac.add(m.beatAtTime(e[1]).frac);
+				}
+			};
+
+			notes.add(n.asArray);
+			// frac = frac.select(_>0).reciprocal.postln;
+			fracsInTracks.add(frac);
+		};
+
+		// get most used intervals
+		{
+			var half = 0;
+			var third = 0;
+			var quarter = 0;
+
+			var histograms = List.new;
+			fracsInTracks.do{ |frac, track|
+				var size = notes[track].size;
+				var h = List.new;
+				["size",size,track].postln;
+				frac.histo(100,0,1).do{|v,i|if(v>(size/10)){h.add(i)}};
+				histograms.add(h);
+			};
+
+			histograms.do{ |histo,track|
+				("histo"++track).postln;
+				histo.postln;
+				histo.do { |div,i|
+					div.postln;
+					switch(div)
+					{0} {}
+					// 2 subdivisions
+					{50} {half = half+1}
+					// 3 subdivisions
+					{33} {third = third + 1}
+					{66} {third = third + 1}
+					// 4 subdivisions
+					{25} {quarter = quarter + 1}
+					{75} {quarter = quarter + 1}
+					// TODO: complete!
+					{};
+				}
+			};
+
+			// set pulse and division
+			pulse = measure[0];
+			if ( quarter >= third ) {
+				division = 4;
+			} {
+				division = 3;
+			};
+		}.();
+
+		// get number of pulses
+		maxPulse=0;
+		notes.do { |noteList| // note[beat,pitch]
+			var pulse = noteList.last[0].round;
+			if ( pulse > maxPulse) {
+				maxPulse = pulse;
+			}
+		};
+		maxPulse = maxPulse + 1; // add some extra duration
+
+		// ADD TO BIGRAM STRUCTURE
+
+		// add tracks
+		noteTracks.do { |track,i|
+			var a = ["set track",track,i].postln;
+			var trackName = bigramEditorWindow.addTrack(save:false); // from window to put gui controls
+			var trackIndex = bigramTrackNames.indexOf(trackName);
+			var trackRef = bigramTracks.at(trackIndex);
+			// set midi program
+			("set program for track"++track).postln;
+			programsInTracks.postln;
+			programsInTracks[i].postln;
+			bigramEditorWindow.setMidiProgram(trackName,programsInTracks[i],save:false);
+			//set channel
+			trackRef.setChannel(channelsInTracks[i]);
+		};
+
+		// add bars
+		pulse = measure[0];
+		numBars = (maxPulse / pulse).ceil;
+		this.addBars(numBars,measure:PD.new(pulse,division),tempo:tempo,save:false);
+
+
+		// add regions: one for each track
+		bigramTracks.do { |track|
+			track.addRegion(BPD.new(0,0,0).print,this.getBPDfromPulseIndex(maxPulse),save:false);
+		};
+
+
+		// set midi instruments: todo!
+
+		// put notes
+		notes.do { |noteList,i|
+			noteList.do { |note|
+				var track = bigramTracks[i];
+				// temporal info
+				var noteBeat = note[0];
+				var roundNoteBeat = noteBeat.round(1/division);
+				var noteBar = (roundNoteBeat / pulse).floor;
+				var notePulse = (roundNoteBeat % pulse).floor;
+				var noteDivision = roundNoteBeat.frac * division;
+				// pitch info
+				var absPitch = note[1];
+				// amp info
+				var amp = note[2];
+
+				var pitch = BPitch.newAbsPitch(absPitch+3); // after is taken away
+				var bpd = BPD.new(noteBar,notePulse,noteDivision);
+
+				var newNote = BigramNote.new(pitch,bpd).midiAmp_(amp);
+
+				["newNote"].postln;
+				newNote.print;
+				track.bigramRegions.first.putNote(newNote,save:false);
+			};
+		};
+
+		bigramEditorWindow.saveTmp;
 
 	}
 
