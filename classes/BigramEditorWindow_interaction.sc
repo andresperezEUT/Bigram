@@ -246,6 +246,7 @@
 	bigramViewKeyDownAction {
 		^{ |view, char, modifiers, unicode, keycode, key|
 			key.postln;
+			modifiers.postln;
 
 			switch (key)
 
@@ -262,6 +263,64 @@
 					bigramEditor.pause;
 				};
 			}
+
+			// control z -> undo
+			{90} {
+				if (modifiers == 262144) {
+					if (bigramEditor.tmpVersion >= 1 ) {
+						var path;
+
+						// remove tracks
+						this.removeAllTracks;
+						// remove bars
+						bigramEditor.tempos= List.new;
+						bigramEditor.barsFromPulses = List.new;
+						bigramEditor.numBars = 0;
+						bigramEditor.measuresFromBars = List.new;
+						// remove bar views
+						this.recalculateCanvasSize;
+
+						bigramEditor.tmpVersion = bigramEditor.tmpVersion - 1;
+						path = bigramEditor.tmpFilePath ++ "_" ++ bigramEditor.tmpVersion.asString;
+						this.loadTmp(path);
+						["bigramEditor.tmpVersion",bigramEditor.tmpVersion].postln;
+						["bigramEditor.tmpMaxVersion",bigramEditor.tmpMaxVersion].postln;
+
+					} {
+						"original state".postln;
+					}
+				};
+				if (modifiers == 393216) { //redo
+					var path;
+
+					//load
+					if (bigramEditor.tmpVersion < bigramEditor.tmpMaxVersion) {
+
+						// remove tracks
+						this.removeAllTracks;
+						// remove bars
+						bigramEditor.tempos= List.new;
+						bigramEditor.barsFromPulses = List.new;
+						bigramEditor.numBars = 0;
+						bigramEditor.measuresFromBars = List.new;
+						// remove bar views
+						this.recalculateCanvasSize;
+
+						bigramEditor.tmpVersion = bigramEditor.tmpVersion + 1;
+						path = bigramEditor.tmpFilePath ++ "_" ++ bigramEditor.tmpVersion.asString;
+						this.loadTmp(path);
+						["bigramEditor.tmpVersion",bigramEditor.tmpVersion].postln;
+						["bigramEditor.tmpMaxVersion",bigramEditor.tmpMaxVersion].postln;
+					} {
+						"last version".postln;
+					};
+				}
+			}
+
+
+
+
+
 
 		}
 	}
