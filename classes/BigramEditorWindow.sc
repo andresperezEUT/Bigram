@@ -169,9 +169,9 @@ BigramEditorWindow {
 
 		bigramOptionsMenuElements =
 		[
-			["File", "new", "open", "close", "save", "saveAs", "import", "export", "print", "configure"],
+			["File", "new", "open", "close", "save", "saveAs", "import"/*, "export", "print", "configure"*/],
 			["Edit", "undo", "redo", "add bars", "tempo"],
-			["Region", "duplicate", "group", "ungroup", "block", "unblock"],
+			["Region", "duplicate", "group", "ungroup",/* "block", "unblock"*/],
 			["Track", "new","duplicate","delete"]
 		];
 		bigramOptionsMenuElements_width = 80;
