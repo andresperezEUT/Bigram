@@ -43,7 +43,7 @@ BigramTrack {
 
 
 	*new { |editor, newName|
-		^super.new.init(editor).setName(newName).setChannel(newName);
+		^super.new.init(editor).setName(newName).setChannelAuto(newName);
 	}
 
 	init { |editor|
@@ -61,7 +61,7 @@ BigramTrack {
 		name = newName.asSymbol;
 	}
 
-	setChannel { |newName|
+	setChannelAuto { |newName|
 		// midi channel will be the name (excluding 9)
 		newName = newName.asInt;
 		if (newName < 8 ) {
@@ -69,6 +69,10 @@ BigramTrack {
 		} {
 			midiChannel = newName + 1;
 		};
+	}
+
+	setChannel { |channel|
+		midiChannel = channel;
 	}
 
 	getRegionIndexByName { |regionName|
@@ -81,21 +85,31 @@ BigramTrack {
 
 	///////////////////////// REGION MANAGING /////////////////////////
 
-	addRegion {|startBPD, endBPD|
+	addRegion {|startBPD, endBPD, save=true|
 		bigramRegions.add(BigramRegion.new(this,startBPD,endBPD));
 		bigramRegionPositions.add([startBPD,endBPD]);
 		bigramRegionNames.add(numTotalRegions.asSymbol);
 		numTotalRegions = numTotalRegions + 1;
+
+		if (save) {
+			"save add region".postln;
+			bigramEditor.bigramEditorWindow.saveTmp;
+		};
+
 		^(numTotalRegions-1).asSymbol;
 	}
 
-	removeRegion { |regionName|
+	removeRegion { |regionName,save=true|
 		var pos = this.getRegionIndexByName(regionName);
 
 		if (pos.isNil.not) {
 			bigramRegions.removeAt(pos);
 			bigramRegionPositions.removeAt(pos);
 			bigramRegionNames.remove(regionName);
+			if (save) {
+				"save remove region".postln;
+				bigramEditor.bigramEditorWindow.saveTmp;
+			};
 		} {
 
 		}
@@ -103,17 +117,33 @@ BigramTrack {
 	}
 
 	// from is \init or \end
-	resizeRegion { |regionName, from, newBPD |
+	resizeRegion { |regionName, from, newBPD, save=true|
 		var pos = this.getRegionIndexByName(regionName);
 		var region = bigramRegions.at(pos);
 
 		if (from==\init) {
 			if (newBPD.beforeEqual(region.endBPD)) {
-				region.setStartBPD(newBPD);
+				region.startBPD.print;
+				newBPD.print;
+				region.startBPD.equal(newBPD);
+				if (region.startBPD.equal(newBPD).not) {
+					if (save) {
+					region.setStartBPD(newBPD); /////
+						"save resize region".postln;
+						bigramEditor.bigramEditorWindow.saveTmp;
+					};
+				};
+
 			}
 		} {
 			if (newBPD.afterEqual(region.startBPD)) {
-				region.setEndBPD(newBPD);
+				if (region.endBPD.equal(newBPD).not) {
+					region.setEndBPD(newBPD); //////
+					if (save) {
+						"save resize region".postln;
+						bigramEditor.bigramEditorWindow.saveTmp;
+					};
+				};
 			}
 		};
 	}
@@ -137,7 +167,7 @@ BigramTrack {
 
 			region.setStartBPD(bigramEditor.getBPDfromPulseIndex(startIndex-numDivisions));
 			region.selectAllNotes;
-			region.moveSelectedNotes(\left,numDivisions*divisionsPerPulse);
+			region.moveSelectedNotes(\left,numDivisions*divisionsPerPulse,save:false);
 			region.deselectAllNotes;
 			region.setEndBPD(bigramEditor.getBPDfromPulseIndex(endIndex-numDivisions));
 		}
@@ -147,12 +177,16 @@ BigramTrack {
 			var measure = bigramEditor.measuresFromBars.at(bar);
 			var divisionsPerPulse = measure.division;
 
-			region.setEndBPD(bigramEditor.getBPDfromPulseIndex(endIndex+numDivisions));
+			var afterEndBPD = bigramEditor.getBPDfromPulseIndex(afterEndIndex);
+			region.setEndBPD(afterEndBPD);
 			region.selectAllNotes;
-			region.moveSelectedNotes(\right,numDivisions*divisionsPerPulse);
+			region.moveSelectedNotes(\right,numDivisions*divisionsPerPulse,save:false);
 			region.deselectAllNotes;
 			region.setStartBPD(bigramEditor.getBPDfromPulseIndex(startIndex+numDivisions));
-		}
+		};
+
+		"save move region".postln;
+		bigramEditor.bigramEditorWindow.saveTmp;
 	}
 
 	duplicateRegion { |regionName|
@@ -169,7 +203,9 @@ BigramTrack {
 		region.notes.do{|note|
 			newRegion.putNote(note.copy);
 		};
-
+		// savetmp already provided in addRegion
+/*		"save duplicate region".postln;
+		bigramEditor.bigramEditorWindow.saveTmp;*/
 	}
 
 	deselectAllRegions {
@@ -203,13 +239,15 @@ BigramTrack {
 			if (region1.bigramTrack == region2.bigramTrack) {
 				if ((start2index - end1index) == 1 ) {
 					// 1. resize region1
-					this.resizeRegion(regionName1,\end,region2.endBPD);
+					this.resizeRegion(regionName1,\end,region2.endBPD,save:false);
 					// 2. copy contents of region2 into region1
 					region2.notes.do{ |note|
 						region1.putNote(note.copy);
 					};
 					// 3. remove region2
-					this.removeRegion(regionName2);
+					this.removeRegion(regionName2,save:false);
+					"save group regions".postln;
+					bigramEditor.bigramEditorWindow.saveTmp;
 				} {
 					"not consecutive".postln;
 				}
@@ -226,7 +264,7 @@ BigramTrack {
 		if (bpd.after(region.startBPD) and:{bpd.beforeEqual(region.endBPD)}) {
 			var a=[bpd,region.startBPD,region.endBPD].postln;
 			//1. create region2
-			var regionName2 = this.addRegion(bpd,region.endBPD);
+			var regionName2 = this.addRegion(bpd,region.endBPD,save:false);
 			var regionIndex2 = this.getRegionIndexByName(regionName2);
 			var region2 = bigramRegions.at(regionIndex2);
 			//2. copy notes after that
@@ -237,10 +275,8 @@ BigramTrack {
 			{
 				var index = bigramEditor.getPulseIndexFromBPD(bpd);
 				var newBpd = bigramEditor.getBPDfromPulseIndex(index+1);
-				"********".postln;
-				bpd.print;
+
 				region.notes.do{ |note|
-					note.bpd.print;
 					if (note.isBefore(bpd).postln) {
 						note.isSelected_(false)
 					} {
@@ -253,8 +289,10 @@ BigramTrack {
 			{
 				var index = bigramEditor.getPulseIndexFromBPD(bpd);
 				var newBpd = bigramEditor.getBPDfromPulseIndex(index-1);
-				this.resizeRegion(regionName,\end,newBpd);
+				this.resizeRegion(regionName,\end,newBpd,save:false);
 			}.();
+			"save split regions".postln;
+			bigramEditor.bigramEditorWindow.saveTmp;
 		} {
 			"not in between".postln;
 		}
@@ -300,6 +338,7 @@ BigramTrack {
 				tempos.add(bigramEditor.tempos.at(bigramEditor.getPulseIndexFromBPD(note.bpd)));
 				// num of divisions of the note's bar
 				barDivisions.add(bigramEditor.measuresFromBars.at(note.bpd.bar).division);
+				// amp
 				amps.add(note.midiAmp);
 
 			};
@@ -452,10 +491,12 @@ BigramTrack {
 
 		// midiout version
 
+		~amps = amps;
+
 		^Pbind(
 			\midinote, Pseq(orderedDegrees.asArray - 3, 1), // bigram main line is A, but is internally coded as 0 (C)
 			\dur, Pseq(durations.asArray, 1),
-			\amp, Pseq(amps.asArray),
+			\amp, Pseq(amps.linlin(0,127,0,1).asArray),
 			\type, \midi,
 			\midiout,bigramEditor.bigramEditorWindow.midiOut,
 			\chan,midiChannel
