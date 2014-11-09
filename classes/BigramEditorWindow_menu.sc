@@ -25,9 +25,9 @@
 
 		/*bigramOptionsMenuElements = 		[
 		["File", "new", "open", "close", "save", "saveAs", "import", "export", "print", "configure"],
+		["Edit", "undo", "redo", "add bars", "tempo"],
 		["Region", "duplicate", "group", "ungroup", "block", "unblock"],
-		["Track", "new","duplicate","delete"],
-		["Window"]
+		["Track", "new","duplicate","delete"]
 		];*/
 
 		switch (row)
@@ -35,11 +35,21 @@
 			switch (column)
 			{1} { //new
 				this.removeAllTracks;
+				// new editor instance
+				bigramEditor = BigramEditor.new(this);
 				savePath = nil;
 				cursorPulseIndex=nil;
-				this.refresh;
+				this.addBars;
 			}
 			{2} { //open
+				// do all done in new
+
+				this.removeAllTracks;
+				// new editor instance
+				bigramEditor = BigramEditor.new(this);
+				savePath = nil;
+				cursorPulseIndex=nil;
+
 				this.loadDocument;
 			}
 			{3} { //close
@@ -59,7 +69,16 @@
 				this.saveDocumentAs;
 			}
 			{6} { //import
-
+				Dialog.openPanel(okFunc:{ |path|
+					// create new
+					this.removeAllTracks;
+					// new editor instance
+					bigramEditor = BigramEditor.new(this);
+					savePath = nil;
+					cursorPulseIndex=nil;
+					// load midi
+					bigramEditor.importMidiFile(path);
+				})
 			}
 			{7} { //export
 
@@ -73,7 +92,69 @@
 			{/*other*/
 			}
 		}
-		{1} { // REGION
+		{1} { // EDIT
+			switch (column)
+			{1} { //undo
+
+				if (bigramEditor.tmpVersion >= 1 ) {
+					var path;
+
+					// remove tracks
+					this.removeAllTracks;
+					// remove bars
+					bigramEditor.tempos= List.new;
+					bigramEditor.barsFromPulses = List.new;
+					bigramEditor.numBars = 0;
+					bigramEditor.measuresFromBars = List.new;
+					// remove bar views
+					this.recalculateCanvasSize;
+
+					bigramEditor.tmpVersion = bigramEditor.tmpVersion - 1;
+					path = bigramEditor.tmpFilePath ++ "_" ++ bigramEditor.tmpVersion.asString;
+					this.loadTmp(path);
+					["bigramEditor.tmpVersion",bigramEditor.tmpVersion].postln;
+					["bigramEditor.tmpMaxVersion",bigramEditor.tmpMaxVersion].postln;
+
+				} {
+					"original state".postln;
+				}
+
+			}
+			{2} { //redo
+				var path;
+
+				//load
+				if (bigramEditor.tmpVersion < bigramEditor.tmpMaxVersion) {
+
+					// remove tracks
+					this.removeAllTracks;
+					// remove bars
+					bigramEditor.tempos= List.new;
+					bigramEditor.barsFromPulses = List.new;
+					bigramEditor.numBars = 0;
+					bigramEditor.measuresFromBars = List.new;
+					// remove bar views
+					this.recalculateCanvasSize;
+
+					bigramEditor.tmpVersion = bigramEditor.tmpVersion + 1;
+					path = bigramEditor.tmpFilePath ++ "_" ++ bigramEditor.tmpVersion.asString;
+					this.loadTmp(path);
+					["bigramEditor.tmpVersion",bigramEditor.tmpVersion].postln;
+					["bigramEditor.tmpMaxVersion",bigramEditor.tmpMaxVersion].postln;
+				} {
+					"last version".postln;
+				};
+			}
+			{3} { // add bars
+				this.addBars;
+			}
+
+			{4} { // set tempo
+				this.setTempo;
+			}
+
+		}
+		{2} { // REGION
 			switch (column)
 			{1} { // duplicate
 				bigramEditor.bigramTracks.do{ |track|
@@ -137,28 +218,27 @@
 			{/*other*/}
 			//undo, redo, cut, copy, paste, delete, group/ungroup, block/unblock, preferencies
 		}
-		{2} { // TRACK
+		{3} { // TRACK
 			switch (column)
 			{1} { //new
 				"add track".postln;
-				this.addTrack;
+				this.addTrack(save:true);
 			}
 			{2} { //duplicate
 				var trackName = bigramEditor.bigramTrackNames.at(selectedTrackIndex);
 				this.duplicateTrack(trackName);
-
+				"save duplicate track".postln;
+				this.saveTmp;
 			}
 			{3} { //delete
 				var a = selectedTrackIndex.postln;
 				var trackName = bigramEditor.bigramTrackNames.at(selectedTrackIndex);
 				this.removeTrack(trackName);
+				"save remove Track".postln;
+				this.saveTmp;
 			}
 			{/*other*/}
 		}
-		{3} { // WINDOW
-
-		}
-
 	}
 
 }
