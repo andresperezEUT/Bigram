@@ -108,6 +108,8 @@ BigramEditorWindow {
 	var <>midiOut;
 	var <>midiInstruments;
 
+	var <>bigramRegionWindowList;
+
 
 	///////////////////////// INITIALIZATION /////////////////////////
 
@@ -122,6 +124,9 @@ BigramEditorWindow {
 
 		trackControls = List.new;
 		trackControlNames = List.new;
+
+		bigramRegionWindowList = List.new;
+
 
 		//////////// midi //////////////////////
 
@@ -145,6 +150,9 @@ BigramEditorWindow {
 		};
 
 
+		/////// save initial state /////
+		this.saveTmp;
+
 
 
 		////// static upper elements
@@ -162,10 +170,9 @@ BigramEditorWindow {
 		bigramOptionsMenuElements =
 		[
 			["File", "new", "open", "close", "save", "saveAs", "import", "export", "print", "configure"],
-			/*			["Edit", "undo", "redo", "cut", "copy", "paste", "delete", "group", "ungroup", "block", "unblock", "preferencies"],*/
-			["Region", "duplicate", "group", "split", "block", "unblock"],
-			["Track", "new","duplicate","delete"],
-			["Window"]
+			["Edit", "undo", "redo", "add bars", "tempo"],
+			["Region", "duplicate", "group", "ungroup", "block", "unblock"],
+			["Track", "new","duplicate","delete"]
 		];
 		bigramOptionsMenuElements_width = 80;
 
@@ -355,25 +362,77 @@ BigramEditorWindow {
 		barTrack.background_(Color.grey(0.9));
 		barTrack.drawFunc = { |view| this.drawBarTrack(view)};
 		barTrack.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
-			var pulseIndex = (x / pulseWidth).floor.asInteger;
-			switch (buttonNumber)
-			{0} { //left button: position pointer
-				cursorPulseIndex = pulseIndex;
+			if (playButton.value == 0) {
+				var pulseIndex = (x / pulseWidth).floor.asInteger;
+				switch (buttonNumber)
+				{0} { //left button: position pointer
+					cursorPulseIndex = pulseIndex;
+				}
+				{1} { //rigth button: position loop
+					loopPulseIndex = pulseIndex;
+				};
+				barTrack.refresh;
+				bigramView.refresh;
 			}
-			{1} { //rigth button: position loop
-				loopPulseIndex = pulseIndex;
-			};
-			barTrack.refresh;
-			bigramView.refresh;
 		};
 
 		tempoTrack = UserView(bigramControlBarsView,Rect(0,bigramControlBarsView_height/3, bigramCanvas_width,bigramControlBarsView_height/3 ));
 		tempoTrack.background_(Color.grey(0.8));
 		tempoTrack.drawFunc = { |view| this.drawTempoTrack(view)};
+		tempoTrack.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
+			if (playButton.value == 0) {
+				var pulseIndex = (x / pulseWidth).floor.asInteger;
+				var bar = bigramEditor.barsFromPulses.at(pulseIndex);
+				var indices = bigramEditor.barsFromPulses.indicesOfEqual(bar);
+
+				var w = Window("set tempo").front.alwaysOnTop_(true);
+				var s = StaticText(w,Rect(10,50,100,30)).string_("new tempo");
+				var number = NumberBox(w,Rect(110,50,100,30)).value_(bigramEditor.defaultTempo);
+				Button(w,Rect(10,200,60,30)).states_([["Ok"]]).action_({|b|
+					var newTempo = number.value;
+					indices.do { |i|
+						bigramEditor.tempos.put(i,newTempo);
+					};
+					this.updateView;
+					w.close;
+					"save change tempo".postln;
+					this.saveTmp;
+				}).focus(true);
+				Button(w,Rect(70,200,60,30)).states_([["Cancel"]]).action_({|b|
+					w.close;
+				});
+			}
+		};
 
 		measureTrack =  UserView(bigramControlBarsView,Rect(0,2*bigramControlBarsView_height/3, bigramCanvas_width,bigramControlBarsView_height/3 ));
 		measureTrack.background_(Color.grey(0.9));
 		measureTrack.drawFunc = { |view| this.drawMeasureTrack(view)};
+		measureTrack.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
+			if (playButton.value == 0) {
+				var pulseIndex = (x / pulseWidth).floor.asInteger;
+				var bar = bigramEditor.barsFromPulses.at(pulseIndex);
+
+				var w = Window("set measure").front.alwaysOnTop_(true);
+				var defaultPulse = bigramEditor.defaultMeasure.pulse;
+				var defaultDivision = bigramEditor.defaultMeasure.division;
+
+				var s = StaticText(w,Rect(10,50,100,30)).string_("new measure");
+				var pulseMenu = PopUpMenu(w,Rect(110,50,50,30)).items_((1..9).collect(_.asString)).value_(defaultPulse-1);
+				var divisionMenu = PopUpMenu(w,Rect(160,50,50,30)).items_((1..9).collect(_.asString)).value_(defaultDivision-1);
+
+
+				Button(w,Rect(10,200,60,30)).states_([["Ok"]]).action_({|b|
+					bigramEditor.measuresFromBars.put(bar,PD.new(pulseMenu.value+1,divisionMenu.value+1));
+					this.updateView;
+					w.close;
+					"save change measure".postln;
+					this.saveTmp;
+				}).focus(true);
+				Button(w,Rect(70,200,60,30)).states_([["Cancel"]]).action_({|b|
+					w.close;
+				});
+			}
+		};
 
 		// track control holders
 		trackControls_name = List.new;
@@ -496,11 +555,60 @@ BigramEditorWindow {
 					bpd.equal(note.bpd).postln;
 					"**".postln;
 					}*/
-
-					var x = (startPulseIndex*pulseWidth) + (subdivisionIndex * pulseWidth / 2);
 					var y = (trackNumber*trackHeight) + (absPitch * trackHeight/ bigramEditor.numOctaves / 12);
+					var initX = startPulseIndex*pulseWidth;
+					var localX = 0;
+					var x = 0;
+					var circleRadius;
+					/////////////////////////////////////////////////
+					var finished = false;
+					var acu = 0;
+					var acuDiv = List.new;
+					var divInPulse = subdivisionIndex;
+					region.divisionsFromPulses.do { |div|
+						acuDiv.add(acu);
+						acu = acu + div;
+					};
+					// "acuDiv".postln;
+					// acuDiv.postln;
 
-					var circleRadius = min(pulseWidth/2,trackHeight/bigramEditor.numOctaves/12);
+					(acuDiv.size-1).do { |i|
+						// ["i",i,"subdivisionIndex",subdivisionIndex,"acuDiv[i]",acuDiv[i],"acuDiv[i+1]",acuDiv[i+1]].postln;
+						if (subdivisionIndex >= acuDiv[i] and:{subdivisionIndex < acuDiv[i+1]}) {
+							// está en este slot: calcular posición
+							var div = region.divisionsFromPulses[i];
+							x = x + (divInPulse*pulseWidth/div);
+
+							// x = x + (pulseWidth/div) + (divInPulse*pulseWidth/div);
+							// "aqui".postln;
+							finished = true;
+							// ["divInPulse",divInPulse].postln;
+						} {
+							if (finished.not) {
+								var div = region.divisionsFromPulses[i];
+								divInPulse = divInPulse - div;
+								// ["divInPulse",divInPulse].postln;
+								// "sumar 1 pulso".postln;
+								// no está en el slot: sumar 1 pulso
+								x = x + pulseWidth;
+							}
+						};
+					};
+					if (finished.not) {
+						// var q = "NOT FINISHED".postln;
+						var  i = acuDiv.size - 1;
+						var div = region.divisionsFromPulses[i];
+						x = x + (divInPulse*pulseWidth/div);
+						// ["divInPulse",divInPulse].postln;
+					};
+					x = x + initX;
+
+					///////////////////////////////////////////////////
+
+
+					// var x = (startPulseIndex*pulseWidth) + (subdivisionIndex * pulseWidth / 2);
+
+					circleRadius = min(pulseWidth/2,trackHeight/bigramEditor.numOctaves/12);
 					Pen.width = 0.5;
 					if (note.getType == \w)
 					{Pen.fillColor = Color.white}
@@ -627,7 +735,10 @@ BigramEditorWindow {
 
 	setPulseWidth { |width|
 		pulseWidth = width;
+		this.recalculateBigramCanvasWidth;
+	}
 
+	recalculateBigramCanvasWidth {
 		// recalculate BigramCanvas width
 		bigramCanvas_width = bigramEditor.numPulses * pulseWidth;
 
@@ -635,8 +746,11 @@ BigramEditorWindow {
 
 		//recalculate controlBarViews bars
 		barTrack.bounds_(Rect(0,0,bigramCanvas_width,bigramControlBarsView_height/3));
+		tempoTrack.bounds_(Rect(0,bigramControlBarsView_height/3,bigramCanvas_width,bigramControlBarsView_height/3));
+		measureTrack.bounds_(Rect(0,2*bigramControlBarsView_height/3,bigramCanvas_width,bigramControlBarsView_height/3));
 
 		bigramCanvas.refresh;
+		barTrack.refresh;
 		this.updateView;
 
 		// todo: también las marcas de compases en bigramOptionsView!!
@@ -675,8 +789,8 @@ BigramEditorWindow {
 
 	///////////////////////// TRACK MANAGING /////////////////////////
 
-	addTrack {
-		var trackName = bigramEditor.addTrack;
+	addTrack { |save|
+		var trackName = bigramEditor.addTrack(save);
 
 		// make the canvas bigger
 		bigramCanvas_height = bigramCanvas_height + trackHeight;
@@ -758,7 +872,7 @@ BigramEditorWindow {
 
 		//name
 		name = StaticText(compositeView,Rect(0,0,bigramTracksOptionsView_width,trackHeight/5));
-		name.string_(trackName).background_(Color.blue).align_(\center);
+		name.string_(trackName).stringColor_(Color.white).background_(Color.grey(0.2)).align_(\center);
 		trackControls_name.add(name);
 
 		//buttons
@@ -852,7 +966,7 @@ BigramEditorWindow {
 		/*		midiOut = PopUpMenu(compositeView,Rect(0,2*trackHeight/5, bigramTracksOptionsView_width,trackHeight/5));
 		midiOut.items = midiInstruments;*/
 		midiOut = StaticText(compositeView,Rect(0,2*trackHeight/5, bigramTracksOptionsView_width,trackHeight/5));
-		midiOut.string_(midiInstruments.at(0)).background_(Color.blue).align_(\center);
+		midiOut.string_(midiInstruments.at(0)).stringColor_(Color.white).background_(Color.grey(0.2)).align_(\center);
 		trackControls_midiOut.add(midiOut);
 		midiOut.mouseDownAction = {
 			var w = Window.new("select MIDI instrument").front;
@@ -861,7 +975,7 @@ BigramEditorWindow {
 			l.value = track.midiProgram;
 			l.action = { |list|
 				var program = list.value;
-				this.setMidiProgram(trackName,program);
+				this.setMidiProgram(trackName,program,save:true);
 				w.close;
 			}
 		};
@@ -890,7 +1004,7 @@ BigramEditorWindow {
 
 	}
 
-	setMidiProgram { |trackName, program|
+	setMidiProgram { |trackName, program, save=true|
 		var trackIndex = bigramEditor.bigramTrackNames.indexOf(trackName);
 		var track = bigramEditor.bigramTracks.at(trackIndex);
 		var midiOut = trackControls_midiOut.at(trackIndex);
@@ -898,6 +1012,11 @@ BigramEditorWindow {
 		track.midiProgram_(program);
 		// send message
 		this.midiOut.program(track.midiChannel,program);
+
+		if (save) {
+			"save set midi program".postln;
+			this.saveTmp;
+		}
 
 	}
 
@@ -937,8 +1056,9 @@ BigramEditorWindow {
 
 	///////////////////////// REGION MANAGING /////////////////////////
 
-	openBigramWindow { |track,region,regionName|
-		BigramRegionWindow.new(this,track,region,regionName);
+	openBigramWindow { |track,trackName,region,regionName|
+		var windowIndex = bigramRegionWindowList.size;
+		bigramRegionWindowList.add(BigramRegionWindow.new(this,track,trackName,region,regionName,windowIndex));
 	}
 
 	setWindowName {
@@ -989,6 +1109,49 @@ BigramEditorWindow {
 		this.updateView;
 	}
 
+	addBars {
+		var defaultPulse, defaultDivision;
+		var w = Window.new("Add bars").front.alwaysOnTop_(true);
+		var barMenu, pulseMenu, divisionMenu, tempoMenu;
+		StaticText(w,Rect(10,50,100,30)).string_("number of Bars");
+		barMenu = PopUpMenu(w,Rect(110,50,50,30)).items_((1..20).collect(_.asString));
+
+		defaultPulse = bigramEditor.defaultMeasure.pulse;
+		defaultDivision = bigramEditor.defaultMeasure.division;
+		StaticText(w,Rect(10,100,100,30)).string_("measure");
+		pulseMenu =  PopUpMenu(w,Rect(110,100,50,30)).items_((1..9).collect(_.asString)).value_(defaultPulse-1);
+		divisionMenu = PopUpMenu(w,Rect(160,100,50,30)).items_((1..9).collect(_.asString)).value_(defaultDivision-1);
+
+		StaticText(w,Rect(10,150,100,30)).string_("tempo");
+		tempoMenu = NumberBox(w,Rect(110,150,50,30)).value_(bigramEditor.defaultTempo);
+
+		Button(w,Rect(10,200,60,30)).states_([["Ok"]]).action_({|b|
+			bigramEditor.addBars(barMenu.value+1,PD.new(pulseMenu.value+1,divisionMenu.value+1),tempoMenu.value);
+			w.close;
+		}).focus(true);
+		Button(w,Rect(70,200,60,30)).states_([["Cancel"]]).action_({|b|
+			w.close;
+		});
+	}
+
+	setTempo {
+
+		var w = Window("set tempo").front.alwaysOnTop_(true);
+		var s = StaticText(w,Rect(10,50,100,30)).string_("new tempo");
+		var number = NumberBox(w,Rect(110,50,100,30)).value_(bigramEditor.defaultTempo);
+		Button(w,Rect(10,200,60,30)).states_([["Ok"]]).action_({|b|
+			var newTempo = number.value;
+			bigramEditor.tempos = bigramEditor.tempos.collect(newTempo);
+			this.updateView;
+			w.close;
+			"save change tempo".postln;
+			this.saveTmp;
+		}).focus(true);
+		Button(w,Rect(70,200,60,30)).states_([["Cancel"]]).action_({|b|
+			w.close;
+		});
+
+	}
 
 }
 
