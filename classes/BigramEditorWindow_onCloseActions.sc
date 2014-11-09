@@ -31,7 +31,9 @@
 			//just in case
 			midiOut.allNotesOff(16);
 
-		}
+		};
+
+		midiOut.stop;
 	}
 
 }
