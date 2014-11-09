@@ -137,6 +137,12 @@ BPitch {
 		^super.new.init(h,c,n)
 	}
 
+	*newAbsPitch { |absPitch = 60, n|
+		var height = (absPitch / 12).floor;
+		var pclass = absPitch % 12;
+		^super.new.init(height,pclass,n);
+	}
+
 	init { |h=4,c=9,n| // A4
 		height = h;
 		pClass = c;
