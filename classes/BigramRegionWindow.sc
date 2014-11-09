@@ -177,7 +177,7 @@ BigramRegionWindow  {
 		insertButton.value_(1); //TODO: this is not working!!
 		editButton.value_(0);
 
-/*		duplicateButton = Button(optionsView, Rect(2*elementSize, 0, elementSize, elementSize));
+		/*		duplicateButton = Button(optionsView, Rect(2*elementSize, 0, elementSize, elementSize));
 		duplicateButton.states = [["d", Color.blue, Color.grey(0.9)]];
 		duplicateButton.action_({ region.duplicateSelectedNotes	});*/
 
@@ -603,6 +603,58 @@ BigramRegionWindow  {
 
 		// d: duplicate selected notes
 		{68} {region.duplicateSelectedNotes}
+
+		{90} {
+			if (modifiers == 262144) {
+				if (editor.bigramEditor.tmpVersion >= 1 ) {
+					var path;
+
+					// remove tracks
+					editor.removeAllTracks;
+					// remove bars
+					editor.bigramEditor.tempos= List.new;
+					editor.bigramEditor.barsFromPulses = List.new;
+					editor.bigramEditor.numBars = 0;
+					editor.bigramEditor.measuresFromBars = List.new;
+					// remove bar views
+					editor.recalculateCanvasSize;
+
+					editor.bigramEditor.tmpVersion = editor.bigramEditor.tmpVersion - 1;
+					path = editor.bigramEditor.tmpFilePath ++ "_" ++ editor.bigramEditor.tmpVersion.asString;
+					editor.loadTmp(path);
+					["bigramEditor.tmpVersion",editor.bigramEditor.tmpVersion].postln;
+					["bigramEditor.tmpMaxVersion",editor.bigramEditor.tmpMaxVersion].postln;
+
+				} {
+					"original state".postln;
+				}
+			};
+			if (modifiers == 393216) { //redo
+				var path;
+
+				//load
+				if (editor.bigramEditor.tmpVersion < editor.bigramEditor.tmpMaxVersion) {
+
+					// remove tracks
+					editor.removeAllTracks;
+					// remove bars
+					editor.bigramEditor.tempos= List.new;
+					editor.bigramEditor.barsFromPulses = List.new;
+					editor.bigramEditor.numBars = 0;
+					editor.bigramEditor.measuresFromBars = List.new;
+					// remove bar views
+					editor.recalculateCanvasSize;
+
+					editor.bigramEditor.tmpVersion = editor.bigramEditor.tmpVersion + 1;
+					path = editor.bigramEditor.tmpFilePath ++ "_" ++ editor.bigramEditor.tmpVersion.asString;
+					editor.loadTmp(path);
+					["bigramEditor.tmpVersion",editor.bigramEditor.tmpVersion].postln;
+					["bigramEditor.tmpMaxVersion",editor.bigramEditor.tmpMaxVersion].postln;
+				} {
+					"last version".postln;
+				};
+			}
+		}
 		;
 		// };
 		this.refresh;
