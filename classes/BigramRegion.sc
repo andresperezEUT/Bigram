@@ -125,20 +125,30 @@ BigramRegion {
 		nextBpd = bigramEditor.getBPDfromPulseIndex(index+1);
 		//remove notes outside range
 		notes.do{ |note,noteIndex|
-			if (note.bpd.afterEqual(nextBpd)) {
-				this.removeNoteAt(noteIndex);
-			};
+			if (nextBpd.isNil.not) {
+				if (note.bpd.afterEqual(nextBpd)) {
+					this.removeNoteAt(noteIndex);
+				};
+			} {
+				// "LAST INDEX!!!!!!!!!!!!!!!!!!!!!!!".postln;
+			}
 		}
 	}
 
 	///////////////////////// NOTE MANAGING /////////////////////////
 
-	putNote{ |note|
-		notes.add(note)
+	putNote{ |note, save=true|
+		notes.add(note);
+		if (save) {
+			"save put note".postln;
+			bigramEditor.bigramEditorWindow.saveTmp;
+		};
 	}
 
 	removeNoteAt{ |index|
-		notes.removeAt(index)
+		notes.removeAt(index);
+		"save remove note".postln;
+		bigramEditor.bigramEditorWindow.saveTmp;
 	}
 
 	getNoteAt{ |index|
@@ -157,7 +167,7 @@ BigramRegion {
 		^notes.select(_.isSelected)
 	}
 
-	moveSelectedNotes { |direction,value|
+	moveSelectedNotes { |direction,value,save=true|
 
 		switch(direction)
 		{\up} {
@@ -204,18 +214,37 @@ BigramRegion {
 
 		}
 		;
+		if (save) {
+			"save move selected notes".postln;
+			bigramEditor.bigramEditorWindow.saveTmp;
+		}
+	}
+
+	duplicateSelectedNotes {
+		var newNotes = List.new;
+		notes.do { |note|
+			if (note.isSelected) {
+				//create copy
+				var newNote = note.copy.isSelected_(false);
+				newNotes.add(newNote);
+				this.putNote(newNote,save:true);
+				note.isSelected_(false);
+			}
+		};
+		newNotes.do(_.isSelected_(true));
 	}
 
 	removeSelectedNotes {
 		// we do it backwards because, when removing a note, the indexes go back
 		var noteIndices = notes.size;
-		(noteIndices-1..0).do{ |noteIndex|
-			var note = notes.at(noteIndex);
+		if (notes.size > 0) {
+			(noteIndices-1..0).do{ |noteIndex|
+				var note = notes.at(noteIndex);
 
-			if (note.isSelected) {
-				this.removeNoteAt(noteIndex);
+				if (note.isSelected) {
+					this.removeNoteAt(noteIndex);
+				}
 			}
-
 		}
 	}
 
@@ -232,9 +261,10 @@ BigramRegion {
 		notes.do(_.isSelected_(false))
 	}
 
+
 	getSubdivisionIndex { |note|
 		var index;
-/*		"bpdList".postln;
+		/*		"bpdList".postln;
 		bpdList.do(_.print);
 		note.bpd.print; ////////////////////////////// <---*/
 		bpdList.do{ |bpd,i|
