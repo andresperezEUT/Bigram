@@ -36,80 +36,84 @@
 			selectedTrackIndex = trackIndex;
 
 			// do things
+			if (playButton.value == 0) {
 
-			switch (mode)
-			{\pen} {
-				if (track.getRegionAtBPD(bpd).isNil) {
-					startRegionBPD = bigramEditor.getBPDfromPulseIndex(pulseIndex);
-					// deselectAllRegions
-					bigramEditor.bigramTracks.do(_.deselectAllRegions);
-				} {
-					// don't create region since it will overlap
-					startRegionBPD = nil;
+				switch (mode)
+				{\pen} {
+					if (track.getRegionAtBPD(bpd).isNil) {
+						startRegionBPD = bigramEditor.getBPDfromPulseIndex(pulseIndex);
+						// deselectAllRegions
+						bigramEditor.bigramTracks.do(_.deselectAllRegions);
+					} {
+						// don't create region since it will overlap
+						startRegionBPD = nil;
+					}
+
 				}
 
-			}
-
-			{\pointer} {
-				// select / deselect region
-				var regionName = track.getRegionAtBPD(bpd);
-				if (holdSelection.not) {
-					bigramEditor.bigramTracks.do(_.deselectAllRegions);
-				};
-				if (regionName.isNil.not) {  //regionName or nil
-					var region = track.bigramRegions.at(track.bigramRegionNames.indexOf(regionName));
-					region.selected_(true);
-
-					// double click: open region window
-					if (clickCount == 2) {
-						this.openBigramWindow(track,region,regionName);
+				{\pointer} {
+					// select / deselect region
+					var regionName = track.getRegionAtBPD(bpd);
+					if (holdSelection.not) {
+						bigramEditor.bigramTracks.do(_.deselectAllRegions);
 					};
+					if (regionName.isNil.not) {  //regionName or nil
+						var region = track.bigramRegions.at(track.bigramRegionNames.indexOf(regionName));
+						region.selected_(true);
 
-					// pointer in resize area
-					//left
-					if (bigramEditor.getBPDfromPulseIndex(pulseIndex).equal(region.startBPD)) {
-						if ((x/pulseWidth).frac < 0.5 and:{((y/trackHeight).frac > 0.75)})
-						{
-							resizeRegion = regionName;
-							resizeDir = \init;
-							resizeTrack = track;
-						} {
-							resizeRegion = nil;
+						// double click: open region window
+						if (clickCount == 2) {
+							this.openBigramWindow(track,trackIndex.asSymbol,region,regionName);
 						};
-					};
-					//right
-					if (bigramEditor.getBPDfromPulseIndex(pulseIndex).equal(region.endBPD)) {
-						if ((x/pulseWidth).frac > 0.5 and:{((y/trackHeight).frac > 0.75)})
-						{
-							resizeRegion = regionName;
-							resizeDir = \end;
-							resizeTrack = track;
-						} {
-							if (region.startBPD.equal(region.endBPD).not) {
+
+						// pointer in resize area
+						//left
+						if (bigramEditor.getBPDfromPulseIndex(pulseIndex).equal(region.startBPD)) {
+							if ((x/pulseWidth).frac < 0.5 and:{((y/trackHeight).frac > 0.75)})
+							{
+								resizeRegion = regionName;
+								resizeDir = \init;
+								resizeTrack = track;
+							} {
 								resizeRegion = nil;
-							}
+							};
 						};
-					};
+						//right
+						if (bigramEditor.getBPDfromPulseIndex(pulseIndex).equal(region.endBPD)) {
+							if ((x/pulseWidth).frac > 0.5 and:{((y/trackHeight).frac > 0.75)})
+							{
+								resizeRegion = regionName;
+								resizeDir = \end;
+								resizeTrack = track;
+							} {
+								if (region.startBPD.equal(region.endBPD).not) {
+									resizeRegion = nil;
+								}
+							};
+						};
 
-					// move region
-					if (resizeRegion.isNil) {
-						moveRegion = regionName;
-						moveTrack = track;
-						moveIndex = pulseIndex;
+						// move region
+						if (resizeRegion.isNil) {
+							moveRegion = regionName;
+							moveTrack = track;
+							moveIndex = pulseIndex;
+						}
+					};
+					// update cursor position
+					cursorPulseIndex = pulseIndex;
+				}
+
+				{\rubber} {
+					// delete region
+					var regionName = track.getRegionAtBPD(bpd).postln;
+					if (regionName.isNil.not) {
+						track.removeRegion(regionName);
+						/*					"save delete region".postln;
+						this.saveTmp;*/
 					}
 				};
-				// update cursor position
-				cursorPulseIndex = pulseIndex;
+				this.updateView;
 			}
-
-			{\rubber} {
-				// delete region
-				var regionName = track.getRegionAtBPD(bpd).postln;
-				if (regionName.isNil.not) {
-					track.removeRegion(regionName);
-				}
-			};
-			this.updateView;
 		}
 	}
 
@@ -122,51 +126,57 @@
 			var trackIndex = (y / trackHeight).floor.asInteger;
 			var track = bigramEditor.bigramTracks.at(trackIndex);
 
-			switch(mode)
-			{\pointer} {
-				// update cursor position
-				cursorPulseIndex = pulseIndex;
-				this.updateView;
+			if (playButton.value == 0) {
+				switch(mode)
+				{\pointer} {
+					// update cursor position
+					cursorPulseIndex = pulseIndex;
+					this.updateView;
 
-				//in case, resize region
-				if (resizeRegion.isNil.not) {
-					var bpd = bigramEditor.getBPDfromPulseIndex(pulseIndex);
-					resizeTrack.resizeRegion(resizeRegion,resizeDir,bpd);
-				};
-
-				// in case, move region
-				if (moveRegion.isNil.not) {
-					var dir;
-					var numDivisions = moveIndex - pulseIndex;
-					if (numDivisions > 0 ) {
-						dir = \left;
-					} {
-						numDivisions = numDivisions.abs;
-						dir = \right;
+					//in case, resize region
+					if (resizeRegion.isNil.not) {
+						var bpd = bigramEditor.getBPDfromPulseIndex(pulseIndex);
+						resizeTrack.resizeRegion(resizeRegion,resizeDir,bpd);
 					};
-					if (moveTrack == track) {
+
+					// in case, move region
+					if (moveRegion.isNil.not) {
+						var dir;
+						var numDivisions = moveIndex - pulseIndex;
 						if (numDivisions > 0 ) {
-							// move along track
-							moveTrack.moveRegion(moveRegion,numDivisions,dir);
-							moveIndex = pulseIndex;
-						}
-					} {
-						// move to another track
-						var regionIndex = moveTrack.bigramRegionNames.indexOf(moveRegion);
-						var region = moveTrack.bigramRegions.at(regionIndex);
-						var newRegionName = track.addRegion(region.startBPD,region.endBPD);
-						var newRegionIndex = track.bigramRegionNames.indexOf(newRegionName);
-						var newRegion = track.bigramRegions.at(newRegionIndex);
-						region.notes.do{|note| newRegion.putNote(note.copy)};
-						// remove old region
-						moveTrack.removeRegion(moveRegion);
+							dir = \left;
+						} {
+							numDivisions = numDivisions.abs;
+							dir = \right;
+						};
+						if (moveTrack == track) {
+							if (numDivisions > 0 ) {
+								// move along track
+								moveTrack.moveRegion(moveRegion,numDivisions,dir);
+								moveIndex = pulseIndex;
+								// "save move region".postln; moveRegion will save
+								// this.saveTmp;
+							}
+						} {
+							// move to another track
+							var regionIndex = moveTrack.bigramRegionNames.indexOf(moveRegion);
+							var region = moveTrack.bigramRegions.at(regionIndex);
+							var newRegionName = track.addRegion(region.startBPD,region.endBPD,save:false);
+							var newRegionIndex = track.bigramRegionNames.indexOf(newRegionName);
+							var newRegion = track.bigramRegions.at(newRegionIndex);
+							region.notes.do{|note| newRegion.putNote(note.copy)};
+							// remove old region
+							moveTrack.removeRegion(moveRegion,save:false);
 
-						moveTrack = track;
-						moveRegion = newRegionName;
-						moveIndex = pulseIndex;
+							moveTrack = track;
+							moveRegion = newRegionName;
+							moveIndex = pulseIndex;
+							"save move track".postln;
+							this.saveTmp;
+						};
 					};
-				}
-			};
+				};
+			}
 		}
 	}
 
@@ -182,51 +192,52 @@
 			var bpd = bigramEditor.getBPDfromPulseIndex(pulseIndex);
 			var track = bigramEditor.bigramTracks.at(trackIndex);
 
-			resizeRegion = nil;
-			moveRegion = nil;
+			if (playButton.value == 0) {
 
-			switch (mode)
-			{\pen} {
+				resizeRegion = nil;
+				moveRegion = nil;
 
-				if (track.getRegionAtBPD(bpd).isNil) {
-					endRegionBPD = bigramEditor.getBPDfromPulseIndex(pulseIndex);
+				switch (mode)
+				{\pen} {
 
-					if (startRegionBPD.isNil.not) {
+					if (track.getRegionAtBPD(bpd).isNil) {
+						endRegionBPD = bigramEditor.getBPDfromPulseIndex(pulseIndex);
 
-						// check that region does not overlap internally
-						var startIndex = bigramEditor.getPulseIndexFromBPD(startRegionBPD).asInteger.postln;
-						var endIndex = pulseIndex.asInteger.postln;
-						var hasRegion = List.new;
-						"CHECK ROUTINE".postln;
+						if (startRegionBPD.isNil.not) {
 
-						// reverse order if created backwards
-						if (endIndex < startIndex) {
-							var aux = startIndex;
-							startIndex = endIndex;
-							endIndex = aux;
-							//
-							aux = startRegionBPD;
-							startRegionBPD = endRegionBPD;
-							endRegionBPD = aux;
-						};
-						(startIndex..endIndex).select{|i|
-							hasRegion.add(track.getRegionAtBPD(bigramEditor.getBPDfromPulseIndex(i)));
-							// this comparison has no effect
-							// but I don't know why I could not manage to get it working with .do
-							1==1;
-						};
+							// check that region does not overlap internally
+							var startIndex = bigramEditor.getPulseIndexFromBPD(startRegionBPD).asInteger.postln;
+							var endIndex = pulseIndex.asInteger.postln;
+							var hasRegion = List.new;
+							"CHECK ROUTINE".postln;
 
-						if (hasRegion.select(_.isNil.not).size == 0 ) {
-							// create region
+							// reverse order if created backwards
+							if (endIndex < startIndex) {
+								var aux = startIndex;
+								startIndex = endIndex;
+								endIndex = aux;
+								//
+								aux = startRegionBPD;
+								startRegionBPD = endRegionBPD;
+								endRegionBPD = aux;
+							};
+							(startIndex..endIndex).select{|i|
+								hasRegion.add(track.getRegionAtBPD(bigramEditor.getBPDfromPulseIndex(i)));
+								// this comparison has no effect
+								// but I don't know why I could not manage to get it working with .do
+								1==1;
+							};
 
+							if (hasRegion.select(_.isNil.not).size == 0 ) {
 
-							track.addRegion(startRegionBPD,endRegionBPD);
-
+								// create region
+								track.addRegion(startRegionBPD,endRegionBPD);
+							}
 						}
 					}
-				}
-			};
-			this.updateView;
+				};
+				this.updateView;
+			}
 		}
 	}
 
