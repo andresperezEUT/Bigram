@@ -27,7 +27,7 @@ BigramNote {
 	var <>isSelected;
 
 	var <>duration; // <--- ??
-	var <>midiAmp = 127; // <--- ??
+	var <>midiAmp = 64; // <--- ??
 
 	*new { |pitch, bpd, region, editor|
 		^super.new.init(pitch,bpd, region, editor)
