@@ -101,6 +101,8 @@ BigramRegionWindow  {
 	var <>windowIndex;
 	var <>trackName;
 
+	var <>drawLines = false;
+
 	//gui
 	// var <showBigramSubdivision;
 	//
@@ -130,6 +132,7 @@ BigramRegionWindow  {
 		};
 
 		window.onClose = {
+			editor.updateView;
 			editor.bigramRegionWindowList.remove(this);
 		};
 		// window.view.hasBorder_(false);
@@ -235,13 +238,24 @@ BigramRegionWindow  {
 		// instanciate view
 		bigramView = UserView(canvasView,Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height)).background_(Color.white);
 
+		bigramView.clearOnRefresh_(false);
+
 		// bigramView = UserView(this,Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height)).background_(Color.white);
 
+
+
+		///////////////////////////////////////////////////7
+
+
 		bigramView.drawFunc = {
+			["drawLines",drawLines].postln;
 			this.drawBigram;
+			["drawLines",drawLines].postln;
+			"bigramViewDrawFunc".postln;
 			this.drawNotes;
 			this.drawSelectionRectangle;
-			editor.updateView; // update note changes in the bigram editor window
+			["drawLines",drawLines].postln;
+			// editor.updateView; // update note changes in the bigram editor window
 		};
 
 
@@ -261,6 +275,7 @@ BigramRegionWindow  {
 		bigramView_height = bigramHeight * numOctaves;
 		bigramView_width = pulseWidth * (numPulses + 0.5); // half pulse more for view
 		bigramView.bounds_(Rect(margin, elementSize.max(margin), bigramView_width, bigramView_height));
+		drawLines = true;
 		this.refresh;
 
 	}
@@ -272,117 +287,125 @@ BigramRegionWindow  {
 		var numBeatSubdivisionsToDraw, beatSubdivisionLineSpace;
 		var subdivisionHeight;
 
-		/////////// HORIZONTAL LINES ////////////
-		//
-		// bigram lines
-		//
 
-		Pen.strokeColor = Color.black;
-		(2*numOctaves + 1).do{ |i| // two octaves
-			if (i.even) {
-				Pen.width = 1.5;
-			} {
-				Pen.width = 0.75;
+		if (drawLines) {
+
+			"----DRAW LINES----".postln;
+
+
+
+			/////////// HORIZONTAL LINES ////////////
+			//
+			// bigram lines
+			//
+
+			Pen.strokeColor = Color.black;
+			(2*numOctaves + 1).do{ |i| // two octaves
+				if (i.even) {
+					Pen.width = 1.5;
+				} {
+					Pen.width = 0.75;
+				};
+
+				Pen.line(0@(i*bigramHeight/2), bigramView_width@(i*bigramHeight/2));
+				// Pen.line(leftSpace@(i*bigramSpace+upperSpace),maxRightPosition@(i*bigramSpace+upperSpace));
+				Pen.stroke;
 			};
 
-			Pen.line(0@(i*bigramHeight/2), bigramView_width@(i*bigramHeight/2));
-			// Pen.line(leftSpace@(i*bigramSpace+upperSpace),maxRightPosition@(i*bigramSpace+upperSpace));
+			//
+			// bigram subdivisions
+			//
+
+			subdivisionHeight = bigramHeight / 6;
+			if (showBigramSubdivision) {
+
+				Pen.strokeColor = Color.red;
+				Pen.width = 0.2;
+				(12 * numOctaves).do {|i| //12 subdivisions per octave
+
+					Pen.line(0@(i*subdivisionHeight), bigramView_width@(i*subdivisionHeight));
+
+				};
+				Pen.stroke;
+			};
+			//
+			// //
+			// //
+			// //
+			///////// VERTICAL LINES ////////////
+
+			// avoid computation due to left margin
+			Pen.translate(pulseWidth*0.5,0);
+
+			// pulse lines
+
+			Pen.strokeColor = Color.black;
+			Pen.width = 0.4;
+			(numPulses+1).do{ |i|
+				Pen.line((i*pulseWidth)@0,(i*pulseWidth)@bigramView_height);
+			};
 			Pen.stroke;
-		};
 
-		//
-		// bigram subdivisions
-		//
 
-		subdivisionHeight = bigramHeight / 6;
-		if (showBigramSubdivision) {
+			// pulse subdivision lines
 
-			Pen.strokeColor = Color.red;
 			Pen.width = 0.2;
-			(12 * numOctaves).do {|i| //12 subdivisions per octave
-
-				Pen.line(0@(i*subdivisionHeight), bigramView_width@(i*subdivisionHeight));
-
+			region.divisionsFromPulses.do{ |divisions,pulse|
+				divisions.do { |d|
+					Pen.line(
+						Point((pulse*pulseWidth)+((d)*pulseWidth/divisions),0),
+						Point((pulse*pulseWidth)+((d)*pulseWidth/divisions),bigramView_height)
+					);
+				}
 			};
 			Pen.stroke;
+
+			// bar lines
+
+			Pen.width = 1;
+			region.barsFromPulses.do { |bar,pulse|
+				if (bar != region.barsFromPulses[(pulse-1).wrap(0,region.barsFromPulses.size-1)]) {
+					Pen.line(
+						Point(pulse*pulseWidth,0),
+						Point(pulse*pulseWidth,bigramView_height)
+					);
+				}
+			};
+			Pen.stroke;
+
+			Pen.translate(pulseWidth*0.5.neg,0);
+
+			// grey left margin
+			// /2 because hardcoded above (+ 0.5) in resizeCanvas
+			Pen.addRect(Rect(0,0,pulseWidth/2,bigramView_height));
+			Pen.fillColor = Color.grey(0.8,alpha:0.5);
+			Pen.fill;
+
+			// piano roll
+			Pen.fillColor = Color.black;
+			Pen.strokeColor = Color.black;
+			Pen.addRect(Rect.fromPoints( Point(0,0), Point(pulseWidth/4,bigramView_height) ));
+			Pen.fill;
+
+			Pen.translate(0,subdivisionHeight/4);
+			Pen.fillColor = Color.white;
+			(bigramView_height / subdivisionHeight).do { |i|
+				var height = i * subdivisionHeight;
+				Pen.addRect(Rect(0,height,pulseWidth/4,subdivisionHeight/2));
+				Pen.fillStroke;
+			};
+			Pen.translate(0,subdivisionHeight/2.neg);
+			// octave numbers
+			numOctaves.do { |i|
+				if (i > 0) {
+					var y  = i * bigramHeight;
+					var string = (i - numOctaves).abs.asString;
+					Pen.stringAtPoint(string,Point(0,y),Font("Helvetica-Bold", 20),Color.red);
+				}
+			};
+			Pen.translate(0,subdivisionHeight/4);
 		};
-		//
-		// //
-		// //
-		// //
-		///////// VERTICAL LINES ////////////
-
-		// avoid computation due to left margin
-		Pen.translate(pulseWidth*0.5,0);
-
-		// pulse lines
-
-		Pen.strokeColor = Color.black;
-		Pen.width = 0.4;
-		(numPulses+1).do{ |i|
-			Pen.line((i*pulseWidth)@0,(i*pulseWidth)@bigramView_height);
-		};
-		Pen.stroke;
-
-
-		// pulse subdivision lines
-
-		Pen.width = 0.2;
-		region.divisionsFromPulses.do{ |divisions,pulse|
-			divisions.do { |d|
-				Pen.line(
-					Point((pulse*pulseWidth)+((d)*pulseWidth/divisions),0),
-					Point((pulse*pulseWidth)+((d)*pulseWidth/divisions),bigramView_height)
-				);
-			}
-		};
-		Pen.stroke;
-
-		// bar lines
-
-		Pen.width = 1;
-		region.barsFromPulses.do { |bar,pulse|
-			if (bar != region.barsFromPulses[(pulse-1).wrap(0,region.barsFromPulses.size-1)]) {
-				Pen.line(
-					Point(pulse*pulseWidth,0),
-					Point(pulse*pulseWidth,bigramView_height)
-				);
-			}
-		};
-		Pen.stroke;
-
-		Pen.translate(pulseWidth*0.5.neg,0);
-
-		// grey left margin
-		// /2 because hardcoded above (+ 0.5) in resizeCanvas
-		Pen.addRect(Rect(0,0,pulseWidth/2,bigramView_height));
-		Pen.fillColor = Color.grey(0.8,alpha:0.5);
-		Pen.fill;
-
-		// piano roll
-		Pen.fillColor = Color.black;
-		Pen.strokeColor = Color.black;
-		Pen.addRect(Rect.fromPoints( Point(0,0), Point(pulseWidth/4,bigramView_height) ));
-		Pen.fill;
-
-		Pen.translate(0,subdivisionHeight/4);
-		Pen.fillColor = Color.white;
-		(bigramView_height / subdivisionHeight).do { |i|
-			var height = i * subdivisionHeight;
-			Pen.addRect(Rect(0,height,pulseWidth/4,subdivisionHeight/2));
-			Pen.fillStroke;
-		};
-		Pen.translate(0,subdivisionHeight/2.neg);
-		// octave numbers
-		numOctaves.do { |i|
-			if (i > 0) {
-				var y  = i * bigramHeight;
-				var string = (i - numOctaves).abs.asString;
-				Pen.stringAtPoint(string,Point(0,y),Font("Helvetica-Bold", 20),Color.red);
-			}
-		};
-		Pen.translate(0,subdivisionHeight/4);
-
+		drawLines = false;
 
 	}
 
@@ -447,6 +470,8 @@ BigramRegionWindow  {
 		var note, noteIndex;
 		lastMouseDownPosition = Point(x,y);
 
+		"MOUSE_DOWN".postln;
+
 		/*		"pointer".postln;
 		[x,y].postln;*/
 
@@ -473,12 +498,21 @@ BigramRegionWindow  {
 				if (noteIndex.isNil) {
 					note.isSelected_(true);
 					region.putNote(note);
+					"PLACE NEW NOTE".postln;
+					this.drawLines_(false);
+					["drawLines",drawLines].postln;
+					bigramView.refresh; ///////////////////////////////////// <------------------------
 					// send test note
 					this.testNote(note);
 				} {
 					// if there is note, remove it
+					"REMOVE NOTE".postln;
 					region.removeNoteAt(noteIndex);
-				}
+					bigramView.clearDrawing;
+					drawLines = true;
+					bigramView.refresh;
+				};
+
 			}
 			{\edit} {
 				// region.deselectAllNotes;
@@ -489,16 +523,21 @@ BigramRegionWindow  {
 				} {
 					// if not, start selection area
 					noteSelectedInLastDown = nil;
-				}
+				};
+				bigramView.clearDrawing;
+				drawLines = true;
+				bigramView.refresh;
 			};
 
-			this.refresh;
-		}
+		};
+
 	}}
 
 	mouseMoveAction { ^{ |view, x, y, modifiers|
 
 		// region.deselectAllNotes;
+
+		"MOUSE_MOVE".postln;
 
 		if (mode == \edit) {
 			if (noteSelectedInLastDown.isNil.not) {
@@ -508,6 +547,7 @@ BigramRegionWindow  {
 				var diffPitch = newNote.pitch.absPitch - lastSelectedNote.pitch.absPitch;
 				var diffDiv;
 				var newNoteIndex, lastNoteIndex;
+				var update = false;
 				region.bpdList.do{ |bpd,i|
 					if (bpd.equal(newNote.bpd)) {newNoteIndex = i};
 					if (bpd.equal(lastSelectedNote.bpd)) {lastNoteIndex = i};
@@ -520,17 +560,21 @@ BigramRegionWindow  {
 
 
 				if (diffPitch > 0) {
-					region.moveSelectedNotes(\up,diffPitch)
+					region.moveSelectedNotes(\up,diffPitch);
+					update=true;
 				};
 				if (diffPitch < 0) {
-					region.moveSelectedNotes(\down,diffPitch.abs)
+					region.moveSelectedNotes(\down,diffPitch.abs);
+					update=true;
 				};
 
 				if (diffDiv > 0) {
-					region.moveSelectedNotes(\right,diffDiv.abs)
+					region.moveSelectedNotes(\right,diffDiv.abs);
+					update=true;
 				};
 				if (diffDiv < 0) {
-					region.moveSelectedNotes(\left,diffDiv.abs)
+					region.moveSelectedNotes(\left,diffDiv.abs);
+					update=true;
 				};
 
 
@@ -539,7 +583,11 @@ BigramRegionWindow  {
 				n.pitch_(newNote.pitch);
 				n.bpd_(newNote.bpd)
 				};*/
-				this.refresh;
+				if (update) {
+					drawLines = true;
+					bigramView.clearDrawing;
+					this.refresh;
+				}
 
 			} {
 				//draw rectangle
@@ -556,6 +604,8 @@ BigramRegionWindow  {
 
 				// update selection rectangle
 				selectionRectangle = Rect.fromPoints(lastMouseDownPosition,x@y);
+				drawLines = true;
+				bigramView.clearDrawing;
 				this.refresh;
 			}
 
@@ -564,10 +614,16 @@ BigramRegionWindow  {
 	}}
 
 	mouseUpAction { ^{ |view, x, y, modifiers|
+
+		"MOUSE_UP".postln;
+
 		if (mode == \edit) {
 			selectionRectangle = nil;
+			// this.drawSelectionRectangle;
+			drawLines = true;
+			bigramView.clearDrawing;
+			this.refresh;
 		};
-		this.refresh;
 
 	}}
 
@@ -581,10 +637,10 @@ BigramRegionWindow  {
 		{69} {editButton.valueAction_(1)} // E: edit mode
 
 		// up arrow: move up 1 semitone selected notes
-		{16777235} {region.moveSelectedNotes(\up,1)}
+		{16777235} {region.moveSelectedNotes(\up,1);}
 
 		// down arrow: move down 1 semitone selected notes
-		{16777237} {region.moveSelectedNotes(\down,1)}
+		{16777237} {region.moveSelectedNotes(\down,1);}
 
 		// left arrow: move left 1 subdivision selected notes
 		{16777234} {region.moveSelectedNotes(\left,1)}
@@ -657,6 +713,8 @@ BigramRegionWindow  {
 		}
 		;
 		// };
+		drawLines = true;
+		bigramView.clearDrawing;
 		this.refresh;
 	}}
 
@@ -749,11 +807,21 @@ BigramRegionWindow  {
 	drawNotes {
 		var circleRadius = min(pulseWidth/2,bigramHeight/12);
 		// "DRAW NOTES".postln;
+		var canvasOrigin = canvasView.visibleOrigin;
+		var canvasWidth = canvasView.bounds.width;
+		var canvasHeight = canvasView.bounds.height;
 
 		region.getAllNotes.do{ |note|
 			var x,y;
+
+			// "bigramCoordinate".postln;
 			#x,y = this.getBigramCoordinate(note);
 
+			/*			"canvasView.canvas.bounds".postln;
+			canvasView.canvas.bounds.postln;*/
+
+			/*			if (x > canvasOrigin.x and:{x < (canvasOrigin.x + canvasWidth)}) {
+			if (y > canvasOrigin.y and:{y < (canvasOrigin.y + canvasHeight)}) {*/
 
 			if (note.getType == \w) {
 				Pen.fillColor = Color.white;
@@ -778,6 +846,9 @@ BigramRegionWindow  {
 			Pen.fillStroke;
 			// note.print;
 
+			/*				}
+			}*/
+
 		}
 	}
 
@@ -799,6 +870,7 @@ BigramRegionWindow  {
 	recalculateViewSize {
 		optionsView.bounds_(Rect(0,0,window.bounds.width,optionsView_height));
 		canvasView.bounds_(Rect(0,optionsView_height,window.bounds.width, window.bounds.height - optionsView_height));
+		drawLines = true;
 		this.refresh;
 
 	}
