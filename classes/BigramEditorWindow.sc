@@ -172,7 +172,7 @@ BigramEditorWindow {
 			["File", "new", "open", "close", "save", "saveAs", "import"/*, "export", "print", "configure"*/],
 			["Edit", "undo", "redo", "add bars", "tempo"],
 			["Region", "duplicate", "group", "ungroup",/* "block", "unblock"*/],
-			["Track", "new","duplicate","delete"]
+			["Track", "new","duplicate","delete", "export"]
 		];
 		bigramOptionsMenuElements_width = 80;
 
@@ -1052,6 +1052,33 @@ BigramEditorWindow {
 
 		/*		bigramTracksOptionsView = CompositeView(bigramView,Rect(0, bigramControlBarsView_height, bigramTracksOptionsView_width,bigramView_height-bigramControlBarsView_height));*/
 
+	}
+
+	exportTrack2pdf {
+		var trackName;
+		var w = Window.new("Export track to pdf").front.alwaysOnTop_(true);
+		var trackText = StaticText(w,Rect(50,50,50,30)).string_("Track");
+		var names = this.bigramEditor.bigramTrackNames.asArray;
+		var trackMenu = PopUpMenu(w,Rect(110,50,50,30)).items_(names).action_({ |me|
+			trackName = me.item.asSymbol;
+		}).valueAction_(0);
+
+		var pathText = StaticText(w,Rect(50,100,50,30)).string_("Path");
+		var pathBox = TextField(w,Rect(110,100,200,30)).string_(Platform.userHomeDir);
+
+		var nameText = StaticText(w,Rect(50,150,50,30)).string_("Name");
+		var nameBox = TextField(w,Rect(110,150,200,30)).string_("bigram");
+
+		Button(w,Rect(10,200,60,30)).states_([["Ok"]]).action_({|b|
+			this.bigramEditor.exportTrack2pdf(trackName,pathBox.string +/+ nameBox.string);
+			w.close;
+		}).focus(true);
+		Button(w,Rect(70,200,60,30)).states_([["Cancel"]]).action_({|b|
+			w.close;
+		});
+
+
+		// this.bigramEditor.exportTrack2pdf(trackName)
 	}
 
 	///////////////////////// REGION MANAGING /////////////////////////
