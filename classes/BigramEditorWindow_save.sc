@@ -40,11 +40,27 @@
 		// define bars
 		bars = d.createElement("bars");
 		bigram.appendChild(bars);
+
+
+
 		bigramEditor.measuresFromBars.do { |measure,barIndex|
 			var bar = d.createElement("bar");
+
+			"-------------".postln;
+
+			barIndex.postln;
+			bigramEditor.barsFromPulses.postln;
+			bigramEditor.barsFromPulses[0].postln;
+			bigramEditor.barsFromPulses[0].class.postln;
+			bigramEditor.barsFromPulses.indexOf(0).postln;
+			// bigramEditor.barsFromPulses.indexOf(barIndex.asFloat).postln;
+			bigramEditor.barsFromPulses.indexOf(barIndex).postln;
+			"-------------".postln;
+
 			bar.setAttribute( "index", barIndex.asString );
 			bar.setAttribute( "pulses", measure.pulse.asString );
 			bar.setAttribute( "divisions", measure.division.asString);
+			// bar.setAttribute( "tempo", bigramEditor.tempos[bigramEditor.barsFromPulses.indexOf(barIndex.asFloat)].asString );
 			bar.setAttribute( "tempo", bigramEditor.tempos[bigramEditor.barsFromPulses.indexOf(barIndex)].asString );
 
 			bars.appendChild(bar);
