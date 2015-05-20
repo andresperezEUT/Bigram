@@ -27,7 +27,7 @@
 		["File", "new", "open", "close", "save", "saveAs", "import", "export", "print", "configure"],
 		["Edit", "undo", "redo", "add bars", "tempo"],
 		["Region", "duplicate", "group", "ungroup", "block", "unblock"],
-		["Track", "new","duplicate","delete"]
+		["Track", "new","duplicate","delete", "export"]
 		];*/
 
 		switch (row)
@@ -236,6 +236,10 @@
 				this.removeTrack(trackName);
 				"save remove Track".postln;
 				this.saveTmp;
+			}
+			{4} { // export
+
+				this.exportTrack2pdf;
 			}
 			{/*other*/}
 		}
