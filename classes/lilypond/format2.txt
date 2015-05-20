@@ -1,0 +1,40 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% bigram
+\score {
+  \new Staff \with {
+    \centerBarToNote
+   
+    
+    \name Bigram
+    \remove "Accidental_engraver"
+    \remove "Key_engraver"
+     \remove "Clef_engraver"
+     
+     \override Stem #'stencil = ##f
+      \override Beam #'stencil = ##f
+     \override TimeSignature #'stencil = ##f
+     \override Rest #'stencil = ##f
+     
+    
+     \numericTimeSignature
+     \override NoteHead #'before-line-breaking = #(mnpNoteHeads 66 1 2)
+  } 
+  {\notes }
+  
+  
+ \layout {
+    \context {
+      \Score
+      \override SystemStartBar.X-offset = #adjust-for-note-head
+      \override SpacingSpanner.strict-note-spacing = ##t
+
+      \time 1/4
+      %time proportional
+      proportionalNotationDuration = #(ly:make-moment 1/10) 
+      % semitione spacing
+      staffLineLayoutFunction = #ly:pitch-semitones 
+
+      % no ledger lines
+      \override StaffSymbol #'ledger-positions = #'(0)
+ 
