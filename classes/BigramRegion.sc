@@ -452,6 +452,11 @@ BigramRegion {
 
 		// ^[orderedDegrees.asArray,durations.asArray];
 
+		// correct the amps array
+		if (orderedDegrees.first == \rest) {
+			amps = [0] ++ amps;
+		};
+
 		// midiout version
 		^Pbind(
 			\midinote, Pseq(orderedDegrees.asArray - 3, 1), // bigram main line is A, but is internally coded as 0 (C)
