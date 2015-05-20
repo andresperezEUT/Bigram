@@ -1,0 +1,104 @@
+\version "2.16.2"
+
+
+#(define adjust-for-note-head
+  (lambda (grob)
+    (let* ((refp (ly:grob-system grob))
+           (bar-coord (ly:grob-relative-coordinate grob refp X))
+           (all (ly:grob-array->list (ly:grob-object refp 'all-elements)))
+           (note-heads
+             (filter
+               (lambda (n)
+                 (eq? (assq-ref (ly:grob-property n 'meta) 'name)
+                      'NoteColumn))
+               all))
+           (note-head-coords
+             (map
+               (lambda (heads)
+                 (interval-center (ly:grob-extent heads refp X)))
+               note-heads))
+           (coords-to-right
+             (filter
+               (lambda (coord) (< bar-coord coord))
+               note-head-coords))
+           (closest-coord
+             (if (pair? coords-to-right)
+                 (apply min
+                       (map (lambda (coord) (- coord bar-coord))
+                            coords-to-right))
+                 0)))
+          
+      (set! (ly:grob-property grob 'extra-offset) (cons closest-coord 0)))))
+      
+centerBarToNote = \override Staff.BarLine.after-line-breaking = #adjust-for-note-head   
+centerSpanBarToNote = \override StaffGroup.SpanBar.after-line-breaking = #adjust-for-note-head
+
+centerStartBar = \override Score.SystemStartBar.X-offset = #adjust-for-note-head
+
+
+
+
+#(define (mnpNoteHeads pattern cfill midpoint) 
+  (lambda (grob)
+	(let* (
+		(fsz  (ly:grob-property grob 'font-size 0.0))
+		(mult (magstep fsz))
+
+		(ptch (ly:event-property (event-cause grob) 'pitch))  
+		(semi (ly:pitch-semitones ptch))
+               (note-shape 0) 
+
+		(notecol (ly:grob-parent   grob    X))
+		(stm     (ly:grob-object   notecol 'stem))
+               (ypos (ly:grob-staff-position grob))
+		;; (stmdir  (ly:grob-property stm     'direction))
+		
+               (fn (ly:grob-default-font grob))
+               (whitenote (ly:font-get-glyph fn "noteheads.s1"))
+               (blacknote (ly:font-get-glyph fn "noteheads.s2"))  
+		)
+		
+		;; NOTEHEADS
+              (case pattern
+                ((66) ;; 6-6 pattern
+                  (set! note-shape (modulo (+ semi cfill) 2))
+		    (set! (ly:grob-property grob 'stencil) 
+			(ly:stencil-scale 
+                         (case note-shape 
+                           ((0) blacknote)
+                           ((1) whitenote)
+                         )
+			mult mult)
+		    ))
+                ((75) ;; 7-5 pattern
+                  (set! note-shape (modulo semi 12))
+                  (set! (ly:grob-property grob 'stencil) 
+			(ly:stencil-scale 
+                         (case note-shape 
+                           ((0) blacknote)
+                           ((1) whitenote)
+                           ((2) blacknote)
+                           ((3) whitenote)
+                           ((4) blacknote)
+                           ((5) whitenote)
+                           ((6) blacknote)
+                           ((7) whitenote)
+                           ((8) blacknote)
+                           ((9) whitenote)
+                           ((10) blacknote)
+                           ((11) whitenote)
+                         )
+			mult mult)
+		      )) 
+                 )
+            ;; DEFAULT STEM DIRECTION
+            (if (< ypos midpoint) 
+              (set! (ly:grob-property stm 'default-direction) 1)
+              (set! (ly:grob-property stm 'default-direction) -1)
+            )
+	)
+))
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
