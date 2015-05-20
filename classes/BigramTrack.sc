@@ -478,24 +478,27 @@ BigramTrack {
 
 		// adjust durations to real tempo
 		// dur 1 is equal to quarter notes at 60bpm...
+		"before".postln;
+		durations.postln;
 		durations = durations / barDivisions / (tempos/60);
+		"after".postln;
+		durations.postln;
 
-		[orderedDegrees.asArray,durations.asArray].postln;
-
+		[orderedDegrees.asArray -3 ,durations.asArray].postln;
 		//create Pbind
 
-		/*		^Pbind(
-		\midinote, Pseq(orderedDegrees.asArray - 3, 1), // bigram main line is A , but is internally coded as 0 (C)
-		\dur, Pseq(durations.asArray, 1),
-		);*/
 
-		// midiout version
 
-		~amps = amps;
+
+		// correct the amps array
+		if (orderedDegrees.first == \rest) {
+			amps = [0] ++ amps;
+		};
 
 		^Pbind(
-			\midinote, Pseq(orderedDegrees.asArray - 3, 1), // bigram main line is A, but is internally coded as 0 (C)
-			\dur, Pseq(durations.asArray, 1),
+			\midinote, Pseq(orderedDegrees.asArray - 3, repeats:1), // bigram main line is A, but is internally coded as 0 (C)
+			\dur, Pseq(durations.asArray , 1),
+			// \legato,1,
 			\amp, Pseq(amps.linlin(0,127,0,1).asArray),
 			\type, \midi,
 			\midiout,bigramEditor.bigramEditorWindow.midiOut,
