@@ -72,6 +72,7 @@ BigramEditor {
 			barsFromPulses.add((i/defaultMeasure.pulse).floor);
 		};
 
+
 		numBars = (defaultNumPulses/defaultMeasure.pulse).ceil;
 		measuresFromBars = List.newUsing(PD()!numBars);
 
@@ -559,7 +560,16 @@ BigramEditor {
 			};
 		};
 
+		// savetmp bug fix
+		// "--------------\n--------------\n--------------".postln;
+		// barsFromPulses.first.class.postln;
+		barsFromPulses = barsFromPulses.collect(_.asInt);
+		// barsFromPulses.first.class.postln;
+		// "--------------\n--------------\n--------------".postln;
+
 		bigramEditorWindow.saveTmp;
+
+
 
 	}
 
