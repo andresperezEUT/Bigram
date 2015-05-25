@@ -29,6 +29,8 @@
 
 		var pdfFilePath;
 
+		var bigramFolder = "Bigram-beta-1/classes";
+
 		// select track
 
 		var track = this.bigramTracks.at(this.bigramTrackNames.indexOf(trackName)); // !!!!!
@@ -112,11 +114,11 @@
 
 		// create ly file with the notes and the bigram format
 
-		formatFile1 = File.new(Platform.userExtensionDir ++ "/bigram/lilypond/format1.txt","r");
+		formatFile1 = File.new(Platform.userExtensionDir +/+ bigramFolder +/+ "lilypond/format1.txt","r");
 		formatString1 = String.readNew(formatFile1);
 		formatFile1.close;
 
-		formatFile2 =File.new(Platform.userExtensionDir ++ "/bigram/lilypond/format2.txt","r");
+		formatFile2 = File.new(Platform.userExtensionDir +/+ bigramFolder +/+ "lilypond/format2.txt","r");
 		formatString2 = String.readNew(formatFile2);
 		formatFile2.close;
 
