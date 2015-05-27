@@ -570,6 +570,10 @@ BigramEditor {
 		bigramEditorWindow.saveTmp;
 
 
+		// fix bug playback bar
+
+		bigramEditorWindow.cursorPulseIndex_(0);
+
 
 	}
 
