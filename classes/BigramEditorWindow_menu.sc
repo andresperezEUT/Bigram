@@ -238,8 +238,9 @@
 				this.saveTmp;
 			}
 			{4} { // export
-
-				this.exportTrack2pdf;
+				if (thisProcess.platformClass == LinuxPlatform) {
+					this.exportTrack2pdf;
+				};
 			}
 			{/*other*/}
 		}
