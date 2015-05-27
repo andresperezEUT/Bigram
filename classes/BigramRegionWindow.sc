@@ -103,6 +103,8 @@ BigramRegionWindow  {
 
 	var <>drawLines = false;
 
+	var <eventStreamPlayer;
+
 	//gui
 	// var <showBigramSubdivision;
 	//
@@ -190,11 +192,11 @@ BigramRegionWindow  {
 		playButton.states = [["P", Color.blue, Color.grey(0.9)]/*,["P", Color.white, Color.blue(0.75)]*/];
 
 		playButton.action_({ |b|
-			var pbind = region.createPatterns;
-			pbind.play;
-			/*			if (region.eventStreamPlayer.isPlaying.not) {
-			region.play;
-			};*/
+			var pbind;
+			if (eventStreamPlayer.isPlaying.not) {
+				pbind = region.createPatterns;
+				eventStreamPlayer = pbind.play;
+			}
 		});
 
 		// showBigramSubdivisionButton
@@ -203,10 +205,14 @@ BigramRegionWindow  {
 		showBigramSubdivisionButton.states = [["s", Color.grey, Color.white], ["s", Color.white, Color.grey]];
 		showBigramSubdivisionButton.action_({ |b|
 			if (b.value == 0) {
+				bigramView.clearDrawing;
+				drawLines = true;
 				showBigramSubdivision = false;
 			} {
+				drawLines = true;
 				showBigramSubdivision = true;
 			};
+
 			this.refresh;
 		});
 
