@@ -167,13 +167,26 @@ BigramEditorWindow {
 		bigramOptionsMenuView = CompositeView(bigramOptionsView,Rect(0,0,bounds.width,bigramOptionsMenuView_height));
 		bigramOptionsMenuView.background_(Color.grey(0.2));
 
-		bigramOptionsMenuElements =
-		[
-			["File", "new", "open", "close", "save", "saveAs", "import"/*, "export", "print", "configure"*/],
-			["Edit", "undo", "redo", "add bars", "tempo"],
-			["Region", "duplicate", "group", "ungroup",/* "block", "unblock"*/],
-			["Track", "new","duplicate","delete", "export"]
-		];
+
+
+		if (thisProcess.platformClass == LinuxPlatform ) {
+			bigramOptionsMenuElements =
+			[
+				["File", "new", "open", "close", "save", "saveAs", "import"/*, "export", "print", "configure"*/],
+				["Edit", "undo", "redo", "add bars", "tempo"],
+				["Region", "duplicate", "group", "ungroup",/* "block", "unblock"*/],
+				["Track", "new","duplicate","delete", "export"]
+			];
+		} {
+			bigramOptionsMenuElements =
+			[
+				["File", "new", "open", "close", "save", "saveAs", "import"/*, "export", "print", "configure"*/],
+				["Edit", "undo", "redo", "add bars", "tempo"],
+				["Region", "duplicate", "group", "ungroup",/* "block", "unblock"*/],
+				["Track", "new","duplicate","delete"]
+			];
+		};
+
 		bigramOptionsMenuElements_width = 80;
 
 		bigramOptionsMenuView.mouseDownAction = { |view, x, y, modifiers, buttonNumber|
@@ -1182,4 +1195,4 @@ BigramEditorWindow {
 
 }
 
-// 
+//
