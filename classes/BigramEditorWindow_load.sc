@@ -259,6 +259,9 @@
 			track = track.getNextSibling;
 		});
 
+		// fix bug playback bar
+
+		cursorPulseIndex = 0;
 
 	}
 
