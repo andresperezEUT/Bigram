@@ -310,7 +310,7 @@ BigramRegionWindow  {
 				if (i.even) {
 					Pen.width = 1.5;
 				} {
-					Pen.width = 0.75;
+					Pen.width = 0.5;
 				};
 
 				Pen.line(0@(i*bigramHeight/2), bigramView_width@(i*bigramHeight/2));
